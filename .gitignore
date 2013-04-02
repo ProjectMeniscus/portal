@@ -1,0 +1,12 @@
+build/
+.coverage
+*.pyc
+*.c
+*.so
+.idea
+meniscus.egg-info
+.tox
+*.DS_Store*
+nosetests.xml
+portal/coverage.xml
+portal.egg-info/*

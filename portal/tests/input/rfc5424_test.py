@@ -1,0 +1,139 @@
+import unittest
+import time
+
+from  portal.input.rfc5424 import SyslogMessageHandler, SyslogParser, SyslogLexer
+
+
+HAPPY_PATH_MESSAGE = bytearray(
+    b'263 <46>1 2012-12-11T15:48:23.217459-06:00 tohru ' +
+    b'rsyslogd 6611 12512 [origin_1 software="rsyslogd" ' +
+    b'swVersion="7.2.2" x-pid="12297" ' +
+    b'x-info="http://www.rsyslog.com"]' +
+    b'[origin_2 software="rsyslogd" swVersion="7.2.2" ' +
+    b'x-pid="12297" x-info="http://www.rsyslog.com"] ' +
+    b'start')
+
+MISSING_FIELDS = bytearray(
+    b'221 <46>1 - tohru ' +
+    b'- 6611 - [origin_1 software="rsyslogd" ' +
+    b'swVersion="7.2.2" x-pid="12297" ' +
+    b'x-info="http://www.rsyslog.com"]' +
+    b'[origin_2 software="rsyslogd" swVersion="7.2.2" ' +
+    b'x-pid="12297" x-info="http://www.rsyslog.com"] ' +
+    b'start')
+
+NO_STRUCTURED_DATA = bytearray(
+    b'33 <46>1 - tohru - 6611 - - start')
+
+
+def chunk_message(data, parser, chunk_size=10):
+    limit = len(data)
+    index = 0
+    while index < limit:
+        next_index = index + chunk_size
+        end_index = next_index if next_index < limit else limit
+        parser.read(data[index:end_index])
+        index = end_index
+
+
+class MessageValidator(SyslogMessageHandler):
+
+    def __init__(self, test):
+        self.test = test
+        self.called = False
+
+
+class HappyPathValidator(MessageValidator):
+
+    def on_message_head(self, msg_head):
+        self.called = True
+        self.test.assertEqual('46', msg_head.priority)
+        self.test.assertEqual('1', msg_head.version)
+        self.test.assertEqual('2012-12-11T15:48:23.217459-06:00', msg_head.timestamp)
+        self.test.assertEqual('tohru', msg_head.hostname)
+        self.test.assertEqual('rsyslogd', msg_head.appname)
+        self.test.assertEqual('6611', msg_head.processid)
+        self.test.assertEqual('12512', msg_head.messageid)
+        self.test.assertEqual(2, len(msg_head.sd))
+
+
+class MissingFieldsValidator(MessageValidator):
+
+    def on_message_head(self, msg_head):
+        self.called = True
+        self.test.assertEqual('46', msg_head.priority)
+        self.test.assertEqual('1', msg_head.version)
+        self.test.assertEqual('-', msg_head.timestamp)
+        self.test.assertEqual('tohru', msg_head.hostname)
+        self.test.assertEqual('-', msg_head.appname)
+        self.test.assertEqual('6611', msg_head.processid)
+        self.test.assertEqual('-', msg_head.messageid)
+        self.test.assertEqual(2, len(msg_head.sd))
+
+
+
+class MissingSDValidator(MessageValidator):
+
+    def on_message_head(self, msg_head):
+        self.called = True
+        self.test.assertEqual('46', msg_head.priority)
+        self.test.assertEqual('1', msg_head.version)
+        self.test.assertEqual('-', msg_head.timestamp)
+        self.test.assertEqual('tohru', msg_head.hostname)
+        self.test.assertEqual('-', msg_head.appname)
+        self.test.assertEqual('6611', msg_head.processid)
+        self.test.assertEqual('-', msg_head.messageid)
+        self.test.assertEqual(0, len(msg_head.sd))
+
+
+class WhenParsingSyslog(unittest.TestCase):
+
+    def test_read_message_head(self):
+        validator = HappyPathValidator(self)
+        parser = SyslogParser(validator)
+
+        chunk_message(HAPPY_PATH_MESSAGE, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        self.assertTrue(validator.called)
+
+    def test_read_message_with_missing_fields(self):
+        validator = MissingFieldsValidator(self)
+        parser = SyslogParser(validator)
+
+        chunk_message(MISSING_FIELDS, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        self.assertTrue(validator.called)
+
+    def test_read_message_with_no_sd(self):
+        validator = MissingSDValidator(self)
+        parser = SyslogParser(validator)
+
+        chunk_message(NO_STRUCTURED_DATA, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        self.assertTrue(validator.called)
+
+
+def performance(duration=10, print_output=True):
+    validator = MessageValidator(None)
+    parser = SyslogParser(validator)
+    runs = 0
+    then = time.time()
+    while time.time() - then < duration:
+        chunk_message(HAPPY_PATH_MESSAGE, parser, 263)
+        runs += 1
+    if print_output:
+        print('Ran {} times in {} seconds for {} runs per second.'.format(
+            runs,
+            duration,
+            runs / float(duration)))
+
+
+if __name__ == '__main__':
+    print('Executing warmup')
+    performance(10, False)
+    print('Executing performance test')
+    performance(5)
+
+    print('Profiling...')
+    import cProfile
+    cProfile.run('performance(5)')
