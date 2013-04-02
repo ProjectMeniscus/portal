@@ -4,6 +4,11 @@ import time
 from  portal.input.rfc5424 import SyslogMessageHandler, SyslogParser, SyslogLexer
 
 
+ACTUAL_MESSAGE = (
+    b'158 <46>1 2013-04-02T14:12:04.873490-05:00 tohru rsyslogd - - - '
+    b'[origin software="rsyslogd" swVersion="7.2.5" x-pid="12662" x-info='
+    b'"http://www.rsyslog.com"] start')
+
 HAPPY_PATH_MESSAGE = bytearray(
     b'263 <46>1 2012-12-11T15:48:23.217459-06:00 tohru ' +
     b'rsyslogd 6611 12512 [origin_1 software="rsyslogd" ' +
@@ -43,13 +48,28 @@ class MessageValidator(SyslogMessageHandler):
         self.called = False
 
 
+class ActualValidator(MessageValidator):
+
+    def on_message_head(self, msg_head):
+        self.called = True
+        self.test.assertEqual('46', msg_head.priority)
+        self.test.assertEqual('1', msg_head.version)
+        self.test.assertEqual('2013-04-02T14:12:04.873490-05:00',
+            msg_head.timestamp)
+        self.test.assertEqual('tohru', msg_head.hostname)
+        self.test.assertEqual('rsyslogd', msg_head.appname)
+        self.test.assertEqual('-', msg_head.processid)
+        self.test.assertEqual('-', msg_head.messageid)
+        self.test.assertEqual(1, len(msg_head.sd))
+
 class HappyPathValidator(MessageValidator):
 
     def on_message_head(self, msg_head):
         self.called = True
         self.test.assertEqual('46', msg_head.priority)
         self.test.assertEqual('1', msg_head.version)
-        self.test.assertEqual('2012-12-11T15:48:23.217459-06:00', msg_head.timestamp)
+        self.test.assertEqual('2012-12-11T15:48:23.217459-06:00',
+            msg_head.timestamp)
         self.test.assertEqual('tohru', msg_head.hostname)
         self.test.assertEqual('rsyslogd', msg_head.appname)
         self.test.assertEqual('6611', msg_head.processid)
@@ -87,6 +107,14 @@ class MissingSDValidator(MessageValidator):
 
 
 class WhenParsingSyslog(unittest.TestCase):
+
+    def test_read_actual_message(self):
+        validator = ActualValidator(self)
+        parser = SyslogParser(validator)
+
+        parser.read(ACTUAL_MESSAGE)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        self.assertTrue(validator.called)
 
     def test_read_message_head(self):
         validator = HappyPathValidator(self)

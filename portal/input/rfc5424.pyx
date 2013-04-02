@@ -3,12 +3,17 @@ from cpython cimport bool
 
 
 cdef extern from "Python.h":
+    int PyByteArray_Check(object bytearray)
     char* PyByteArray_AsString(object bytearray) except NULL
+    Py_ssize_t PyByteArray_Size(object bytearray)
+
+    int PyBytes_Check(object bytes)
+    char* PyBytes_AsString(object bytes) except NULL
+    Py_ssize_t PyBytes_Size(object bytes)
+
     object PyUnicode_FromStringAndSize(char *string, Py_ssize_t length)
     object PyString_FromStringAndSize(char *string, Py_ssize_t length)
     object PyByteArray_FromStringAndSize(char *string, Py_ssize_t length)
-    int PyByteArray_Check(object bytearray)
-    int PyByteArray_Size(object bytearray)
 
 
 # Lexer states
@@ -168,9 +173,17 @@ cdef class CSyslogParser(object):
     def read(self, object bytearray):
         self._read(bytearray)
 
-    cdef void _read(self, object bytearray):
-        cdef int bytes_left = len(bytearray)
-        self.lexer.set_data(PyByteArray_AsString(bytearray))
+    cdef void _read(self, object data):
+        cdef int bytes_left = 0
+        if PyByteArray_Check(data):
+            bytes_left = PyByteArray_Size(data)
+            self.lexer.set_data(PyByteArray_AsString(data))
+        elif PyBytes_Check(data):
+            bytes_left = PyBytes_Size(data)
+            self.lexer.set_data(PyBytes_AsString(data))
+        else:
+            raise Exception('Unable to extract bytes from unknown object type: {}'.format(data))
+
         while bytes_left > 0:
             self.lexer.next()
             if self.lexer.has_token():
