@@ -4,19 +4,26 @@ import weakref
 import errno
 import logging
 import pyev
+import json
 
-from portal.input.rfc5424 import SyslogParser
+from portal.env import get_logger
+from portal.input.rfc5424 import SyslogParser, SyslogMessageHandler
 
-logging.basicConfig(level=logging.DEBUG)
+_LOG = get_logger('portal.server')
 
 STOPSIGNALS = (signal.SIGINT, signal.SIGTERM)
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 
-class SyslogMessageHandler(object):
+class MessageHandler(SyslogMessageHandler):
+
+    def __init__(self):
+        self.msg_count = 0
 
     def on_message_head(self, message_head):
-        logging.debug('Recieved message from the {} facility.'.format(message_head.appname))
+        self.msg_count += 1
+        if self.msg_count % 100000 == 0:
+            _LOG.debug('Messages processed: {}'.format(self.msg_count))
 
     def on_message_part(self, message_part):
         pass
@@ -25,14 +32,14 @@ class SyslogMessageHandler(object):
 class Connection(object):
 
     def __init__(self, sock, address, loop):
-        self.parser = SyslogParser(SyslogMessageHandler())
+        self.parser = SyslogParser(MessageHandler())
         self.sock = sock
         self.address = address
         self.sock.setblocking(0)
         self.buf = b''
         self.watcher = pyev.Io(self.sock, pyev.EV_READ, loop, self.io_cb)
         self.watcher.start()
-        logging.debug("{0}: ready".format(self))
+        _LOG.debug("{0}: ready".format(self))
 
     def reset(self, events):
         self.watcher.stop()
@@ -40,7 +47,7 @@ class Connection(object):
         self.watcher.start()
 
     def handle_error(self, msg, level=logging.ERROR, exc_info=True):
-        logging.log(level, "{0}: {1} --> closing".format(self, msg),
+        _LOG.log(level, "{0}: {1} --> closing".format(self, msg),
                     exc_info=exc_info)
         self.close()
 
@@ -50,6 +57,7 @@ class Connection(object):
         except socket.error as err:
             if err.args[0] not in NONBLOCKING:
                 self.handle_error("error reading from {0}".format(self.sock))
+
         if buf:
             self.parser.read(buf)
         else:
@@ -63,7 +71,7 @@ class Connection(object):
         self.sock.close()
         self.watcher.stop()
         self.watcher = None
-        logging.debug("{0}: closed".format(self))
+        _LOG.debug("{0}: closed".format(self))
 
 
 class Server(object):
@@ -82,7 +90,7 @@ class Server(object):
         self.conns = weakref.WeakValueDictionary()
 
     def handle_error(self, msg, level=logging.ERROR, exc_info=True):
-        logging.log(level, "{0}: {1} --> stopping".format(self, msg),
+        _LOG.log(level, "{0}: {1} --> stopping".format(self, msg),
                     exc_info=exc_info)
         self.stop()
 
@@ -94,7 +102,7 @@ class Server(object):
             while True:
                 try:
                     sock, address = self.sock.accept()
-                    logging.debug('Accepted connection from: {}'.format(address))
+                    _LOG.debug('Accepted connection from: {}'.format(address))
                 except socket.error as err:
                     if err.args[0] in NONBLOCKING:
                         break
@@ -109,7 +117,7 @@ class Server(object):
         self.sock.listen(socket.SOMAXCONN)
         for watcher in self.watchers:
             watcher.start()
-        logging.debug("{0}: started on {0.address}".format(self))
+        _LOG.debug("{0}: started on {0.address}".format(self))
         self.loop.start()
 
     def stop(self):
@@ -119,7 +127,7 @@ class Server(object):
             self.watchers.pop().stop()
         for conn in self.conns.values():
             conn.close()
-        logging.debug("{0}: stopped".format(self))
+        _LOG.debug("{0}: stopped".format(self))
 
 
 if __name__ == "__main__":

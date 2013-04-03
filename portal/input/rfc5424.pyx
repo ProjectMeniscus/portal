@@ -104,12 +104,12 @@ class SyslogMessageHead(object):
 class SyslogParser(object):
 
     def __init__(self, message_handler=SyslogMessageHandler()):
-        self.cparser = CSyslogParser(self)
         self.message = SyslogMessageHead()
         self.sd_name = None
         self.sd_fieldname = None
         self.message_handler = message_handler
         self.message_head_passed = False
+        self.cparser = CSyslogParser(self)
 
     def read(self, bytearray):
         self.cparser.read(bytearray)
@@ -151,7 +151,10 @@ def add_sd_field(parser, name, field_name, value):
     parser.message.add_sd_field(name, field_name, value)
 
 def on_message_part(parser, message_part):
-    parser.message_handler.on_message_part(message_part)
+    try:
+        parser.message_handler.on_message_part(message_part)
+    except Exception as ex:
+        print('Failure: {}'.format(ex))
 
 
 cdef class CSyslogParser(object):
@@ -189,9 +192,6 @@ cdef class CSyslogParser(object):
             if self.lexer.has_token():
                 self.handle_token()
             bytes_left -= 1
-
-    def hand_off_message_head(self):
-        self.message_handler.on_message_head(self.message)
 
     cdef void handle_token(self):
         cdef int token_type = self.lexer.token_type()
@@ -368,7 +368,7 @@ cdef class SyslogLexer(object):
 
         try:
             self.copy_into(octet_buffer)
-            self.octets_left = atoi(octet_buffer) - octets_read
+            self.octets_left = atoi(octet_buffer)
         finally:
             free(octet_buffer)
 

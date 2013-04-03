@@ -10,7 +10,7 @@ ACTUAL_MESSAGE = (
     b'"http://www.rsyslog.com"] start')
 
 HAPPY_PATH_MESSAGE = bytearray(
-    b'263 <46>1 2012-12-11T15:48:23.217459-06:00 tohru ' +
+    b'259 <46>1 2012-12-11T15:48:23.217459-06:00 tohru ' +
     b'rsyslogd 6611 12512 [origin_1 software="rsyslogd" ' +
     b'swVersion="7.2.2" x-pid="12297" ' +
     b'x-info="http://www.rsyslog.com"]' +
@@ -19,7 +19,7 @@ HAPPY_PATH_MESSAGE = bytearray(
     b'start')
 
 MISSING_FIELDS = bytearray(
-    b'221 <46>1 - tohru ' +
+    b'216 <46>1 - tohru ' +
     b'- 6611 - [origin_1 software="rsyslogd" ' +
     b'swVersion="7.2.2" x-pid="12297" ' +
     b'x-info="http://www.rsyslog.com"]' +
@@ -28,11 +28,12 @@ MISSING_FIELDS = bytearray(
     b'start')
 
 NO_STRUCTURED_DATA = bytearray(
-    b'33 <46>1 - tohru - 6611 - - start')
+    b'28 <46>1 - tohru - 6611 - - start')
 
 
-def chunk_message(data, parser, chunk_size=10):
-    limit = len(data)
+def chunk_message(data, parser, chunk_size=10, limit=-1):
+    if limit <= 0:
+        limit = len(data)
     index = 0
     while index < limit:
         next_index = index + chunk_size
@@ -46,12 +47,14 @@ class MessageValidator(SyslogMessageHandler):
     def __init__(self, test):
         self.test = test
         self.called = False
+        self.times_called = 0
 
 
 class ActualValidator(MessageValidator):
 
     def on_message_head(self, msg_head):
         self.called = True
+        self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
         self.test.assertEqual('1', msg_head.version)
         self.test.assertEqual('2013-04-02T14:12:04.873490-05:00',
@@ -66,6 +69,7 @@ class HappyPathValidator(MessageValidator):
 
     def on_message_head(self, msg_head):
         self.called = True
+        self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
         self.test.assertEqual('1', msg_head.version)
         self.test.assertEqual('2012-12-11T15:48:23.217459-06:00',
@@ -81,6 +85,7 @@ class MissingFieldsValidator(MessageValidator):
 
     def on_message_head(self, msg_head):
         self.called = True
+        self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
         self.test.assertEqual('1', msg_head.version)
         self.test.assertEqual('-', msg_head.timestamp)
@@ -96,6 +101,7 @@ class MissingSDValidator(MessageValidator):
 
     def on_message_head(self, msg_head):
         self.called = True
+        self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
         self.test.assertEqual('1', msg_head.version)
         self.test.assertEqual('-', msg_head.timestamp)
@@ -140,6 +146,19 @@ class WhenParsingSyslog(unittest.TestCase):
         self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
 
+    def test_read_messages_back_to_back(self):
+        validator = ActualValidator(self)
+        parser = SyslogParser(validator)
+
+        chunk_message(ACTUAL_MESSAGE, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        chunk_message(ACTUAL_MESSAGE, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        chunk_message(ACTUAL_MESSAGE, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        chunk_message(ACTUAL_MESSAGE, parser)
+        self.assertEqual(0, parser.cparser._lexer().remaining())
+        self.assertEqual(4, validator.times_called)
 
 def performance(duration=10, print_output=True):
     validator = MessageValidator(None)
