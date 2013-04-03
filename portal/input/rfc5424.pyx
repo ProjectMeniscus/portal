@@ -95,10 +95,24 @@ class SyslogMessageHead(object):
         return self.sd.get(name)
 
     def create_sd(self, sd_name):
-        self.sd[sd_name] = dict()
+        self.sd[str(sd_name)] = dict()
 
     def add_sd_field(self, sd_name, sd_fieldname, sd_value):
-        self.sd[sd_name][sd_fieldname] = sd_value
+        self.sd[str(sd_name)][str(sd_fieldname)] = sd_value
+
+    def as_json(self):
+        pass
+
+    def as_dict(self):
+        return {
+            'priority': self.priority,
+            'priority': self.version,
+            'priority': self.timestamp,
+            'priority': self.hostname,
+            'priority': self.appname,
+            'priority': self.processid,
+            'priority': self.messageid
+        }
 
 
 class SyslogParser(object):
@@ -251,7 +265,7 @@ cdef class SyslogLexer(object):
     def get_token_as_string(self):
         cdef object next_token
         # Export the token info
-        next_token = PyUnicode_FromStringAndSize(self.token_buffer, self.token_length)
+        next_token = PyByteArray_FromStringAndSize(self.token_buffer, self.token_length)
         # Reset the token info
         self.token_length = 0
         self.buffered_octets = 0
