@@ -36,7 +36,6 @@ class Connection(object):
         self.sock = sock
         self.address = address
         self.sock.setblocking(0)
-        self.buf = b''
         self.watcher = pyev.Io(self.sock, pyev.EV_READ, loop, self.io_cb)
         self.watcher.start()
         _LOG.debug("{0}: ready".format(self))
