@@ -104,15 +104,23 @@ class SyslogMessageHead(object):
         pass
 
     def as_dict(self):
-        return {
-            'priority': self.priority,
-            'priority': self.version,
-            'priority': self.timestamp,
-            'priority': self.hostname,
-            'priority': self.appname,
-            'priority': self.processid,
-            'priority': self.messageid
+        sd_copy = dict()
+        dictionary = {
+            'priority': str(self.priority),
+            'version': str(self.version),
+            'timestamp': str(self.timestamp),
+            'hostname': str(self.hostname),
+            'appname': str(self.appname),
+            'processid': str(self.processid),
+            'messageid': str(self.messageid),
+            'sd': sd_copy
         }
+
+        for sd_name in self.sd:
+            sd_copy[sd_name] = dict()
+            for sd_fieldname in self.sd[sd_name]:
+                sd_copy[sd_name][sd_fieldname] = self.sd[sd_name][sd_fieldname].decode('utf-8')
+        return dictionary
 
 
 class SyslogParser(object):
