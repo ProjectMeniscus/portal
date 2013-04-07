@@ -18,6 +18,9 @@ setup(
     ext_modules = [
         Extension("portal.input.rfc5424",
                   ["portal/input/rfc5424.pyx"],
+                  extra_compile_args=COMPILER_ARGS),
+        Extension("portal.output.json_stream",
+                  ["portal/output/json_stream.pyx"],
                   extra_compile_args=COMPILER_ARGS)
     ]
 )
@@ -34,7 +37,7 @@ setup(
     ],
     install_requires=[
         "cython",
-	"pyev"
+	    "pyev"
     ],
     test_suite = 'nose.collector',
     zip_safe=False,

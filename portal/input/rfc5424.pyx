@@ -72,12 +72,14 @@ cdef int MAX_BYTES = 536870912
 
 class SyslogMessageHandler(object):
 
-    def on_message_head(self, message_head):
+    def message_head(self, message_head):
         pass
 
-    def on_message_part(self, message_part):
+    def message_part(self, message_part):
         pass
 
+    def message_complete(self, message_part):
+        pass
 
 class SyslogMessageHead(object):
 
@@ -142,9 +144,6 @@ class SyslogParser(object):
         self.message_head_passed = False
 
 
-def hand_off_message_head(parser):
-    parser.message_handler.on_message_head(parser.message)
-
 def set_priority(parser, priority):
     parser.message.priority = priority
 
@@ -172,9 +171,21 @@ def create_sd_element(parser, name):
 def add_sd_field(parser, name, field_name, value):
     parser.message.add_sd_field(name, field_name, value)
 
-def on_message_part(parser, message_part):
+def hand_off_message_head(parser):
     try:
-        parser.message_handler.on_message_part(message_part)
+        parser.message_handler.message_head(parser.message)
+    except Exception as ex:
+        print('Failure: {}'.format(ex))
+
+def message_part(parser, message_part):
+    try:
+        parser.message_handler.message_part(message_part)
+    except Exception as ex:
+        print('Failure: {}'.format(ex))
+
+def message_complete(parser, last_message_part):
+    try:
+        parser.message_handler.message_complete(last_message_part)
     except Exception as ex:
         print('Failure: {}'.format(ex))
 
@@ -243,11 +254,11 @@ cdef class CSyslogParser(object):
             if not self.message_head_passed:
                 hand_off_message_head(self.python_wrapper)
                 self.message_head_passed = True
-            on_message_part(self.python_wrapper, self.lexer.get_token())
+            message_part(self.python_wrapper, self.lexer.get_token())
         elif token_type == LAST_MESSAGE_PART_TOKEN:
             if not self.message_head_passed:
                 hand_off_message_head(self.python_wrapper)
-            on_message_part(self.python_wrapper, self.lexer.get_token())
+            message_complete(self.python_wrapper, self.lexer.get_token())
             self.message_head_passed = False
 
 

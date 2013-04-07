@@ -52,7 +52,7 @@ class MessageValidator(SyslogMessageHandler):
 
 class ActualValidator(MessageValidator):
 
-    def on_message_head(self, msg_head):
+    def message_head(self, msg_head):
         self.called = True
         self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
@@ -67,7 +67,7 @@ class ActualValidator(MessageValidator):
 
 class HappyPathValidator(MessageValidator):
 
-    def on_message_head(self, msg_head):
+    def message_head(self, msg_head):
         self.called = True
         self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
@@ -83,7 +83,7 @@ class HappyPathValidator(MessageValidator):
 
 class MissingFieldsValidator(MessageValidator):
 
-    def on_message_head(self, msg_head):
+    def message_head(self, msg_head):
         self.called = True
         self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)
@@ -99,7 +99,7 @@ class MissingFieldsValidator(MessageValidator):
 
 class MissingSDValidator(MessageValidator):
 
-    def on_message_head(self, msg_head):
+    def message_head(self, msg_head):
         self.called = True
         self.times_called += 1
         self.test.assertEqual('46', msg_head.priority)

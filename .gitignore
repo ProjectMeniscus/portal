@@ -4,9 +4,9 @@ build/
 *.c
 *.so
 .idea
-meniscus.egg-info
+Meniscus_Portal.egg-info/
+#*
 .tox
 *.DS_Store*
 nosetests.xml
 portal/coverage.xml
-portal.egg-info/*

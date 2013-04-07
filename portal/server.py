@@ -18,15 +18,24 @@ NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 class MessageHandler(SyslogMessageHandler):
 
     def __init__(self):
+        self.msg = b''
+        self.msg_head = None
         self.msg_count = 0
 
-    def on_message_head(self, message_head):
+    def message_head(self, message_head):
         self.msg_count += 1
-        if self.msg_count % 100000 == 0:
-            _LOG.debug('Messages processed: {}'.format(self.msg_count))
+        self.msg_head = message_head
 
-    def on_message_part(self, message_part):
-        pass
+    def message_part(self, message_part):
+        self.msg += message_part
+
+    def message_complete(self, last_message_part):
+#        if self.msg_count % 100000 == 0:
+        message_dict = self.msg_head.as_dict()
+        message_dict['message'] = (self.msg + last_message_part).decode('utf-8')
+        _LOG.debug('Message: {}'.format(json.dumps(message_dict)))
+        self.msg_head = None
+        self.msg = b''
 
 
 class Connection(object):
