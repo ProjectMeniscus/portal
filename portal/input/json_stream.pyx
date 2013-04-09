@@ -108,12 +108,12 @@ cdef int EVENT_OBJECT_END = 3
 cdef int EVENT_ARRAY_START = 4
 cdef int EVENT_ARRAY_END = 5
 cdef int EVENT_FIELDNAME = 6
-cdef int EVENT_STRING_VALUE = 7
-cdef int EVENT_NUMBER_VALUE = 8
-cdef int EVENT_TRUE_VALUE = 9
-cdef int EVENT_FALSE_VALUE = 10
-cdef int EVENT_NULL_VALUE = 11
-cdef int EVENT_MSG_END = 12
+cdef int EVENT_STRING_VALUE_PART = 7
+cdef int EVENT_STRING_VALUE_END = 8
+cdef int EVENT_NUMBER_VALUE = 9
+cdef int EVENT_TRUE_VALUE = 10
+cdef int EVENT_FALSE_VALUE = 11
+cdef int EVENT_NULL_VALUE = 12
 
 
 # Inline helper functions
@@ -172,9 +172,11 @@ cdef inline char unwrap_escape_code(char escape_code):
     else:
         raise Exception('Unknown escape code: {}'.format(escape_code))
 
+
 cdef inline bool is_escaped_code(char value):
     cdef char *ESCAPABLE = [NEWLINE_CODE, BACKSPACE_CODE, CARRIAGE_RETURN_CODE, FORMFEED_CODE, TAB_CODE, SOLIDUS, REVERSE_SOLIDUS, QUOTE]
     return oneof(value, ESCAPABLE, 8)
+
 
 cdef inline bool is_whitespace(char value):
     cdef char *WHITESPACE = [SPACE, NEW_LINE, CARRIAGE_RETURN, TAB]
@@ -182,9 +184,6 @@ cdef inline bool is_whitespace(char value):
 
 
 class JsonEventHandler(object):
-
-    def message_end(self):
-        pass
 
     def begin_object(self):
         pass
@@ -201,7 +200,10 @@ class JsonEventHandler(object):
     def fieldname(self, fieldname):
         pass
 
-    def string_value(self, value):
+    def string_value_part(self, bytes):
+        pass
+
+    def string_value_end(self, bytes):
         pass
 
     def number_value(self, value):
@@ -225,9 +227,7 @@ cdef class JsonEventDispatcher(object):
         self.python_handler = python_handler
 
     cdef void handle_structure_event(self, int event):
-        if event == EVENT_MSG_END:
-            self.python_handler.message_end()
-        elif event == EVENT_OBJECT_START:
+        if event == EVENT_OBJECT_START:
             self.python_handler.begin_object()
         elif event == EVENT_OBJECT_END:
             self.python_handler.end_object()
@@ -239,8 +239,10 @@ cdef class JsonEventDispatcher(object):
     cdef void handle_token_event(self, int event, object token):
         if event == EVENT_FIELDNAME:
             self.python_handler.fieldname(token)
-        elif event == EVENT_STRING_VALUE:
-            self.python_handler.string_value(token)
+        elif event == EVENT_STRING_VALUE_PART:
+            self.python_handler.string_value_part(token)
+        elif event == EVENT_STRING_VALUE_END:
+            self.python_handler.string_value_end(token)
         elif event == EVENT_NUMBER_VALUE:
             self.python_handler.number_value(token)
         elif event == EVENT_TRUE_VALUE:
@@ -350,7 +352,6 @@ cdef class JsonLexer(object):
         self.tree_depth -= 1
         if self.tree_depth == 0:
             self.set_state(START_MSG)
-            self.dispatch.handle_structure_event(EVENT_MSG_END)
 
     cdef void unexpected(self, char unexpected):
         raise Exception('Unexpected token: {}. State is: {}'.format(chr(unexpected), self.current_state))
@@ -410,39 +411,39 @@ cdef class JsonLexer(object):
             self.consume()
 
     cdef void read_fieldname(self, char next_byte):
-        if self.read_string(next_byte):
+        if next_byte != QUOTE:
+            self.read_string(next_byte)
+        else:
             # Done reading the fieldname
             self.dispatch_token(EVENT_FIELDNAME)
             self.set_state(FIELD_VALUE_SEPARATOR)
+            self.consume()
 
     cdef void read_string_value(self, char next_byte):
-        if self.read_string(next_byte):
+        if next_byte != QUOTE:
+            self.read_string(next_byte)
+        else:
             # Done reading the fieldname
-            self.dispatch_token(EVENT_STRING_VALUE)
+            self.dispatch_token(EVENT_STRING_VALUE_END)
             self.set_state(VALUE_END)
+            self.consume()
 
-    cdef bool read_string(self, char next_byte):
-        cdef bool finished = False
+    cdef void read_string(self, char next_byte):
         if not self.escaped:
-            finished = self.read_unescaped_string(next_byte)
+            if self.buffered_octets + 4 >= self.buffer_size:
+                self.dispatch_token(EVENT_STRING_VALUE_PART)
+            self.read_unescaped_string(next_byte)
         else:
             self.read_escaped_string(next_byte)
-        return finished
 
-    cdef bool read_unescaped_string(self, char next_byte):
-        cdef bool finished = False
-        if next_byte == QUOTE:
-            # Finished reading this string
-            self.consume()
-            finished = True
-        elif next_byte == REVERSE_SOLIDUS:
+    cdef void read_unescaped_string(self, char next_byte):
+        if next_byte == REVERSE_SOLIDUS:
             # Encountered escape sequence
             self.escaped = True
             self.consume()
         else:
             # Collect string character
             self.collect(next_byte)
-        return finished
 
     cdef void read_escaped_string(self, char next_byte):
         if is_escaped_code(next_byte):

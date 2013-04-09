@@ -38,9 +38,6 @@ class EventValidator(JsonEventHandler):
         if len(output) > 0:
             self.test.fail(output)
 
-    def message_end(self):
-        self._called('message_end')
-
     def begin_object(self):
         self._called('begin_object')
 
@@ -56,8 +53,11 @@ class EventValidator(JsonEventHandler):
     def fieldname(self, fieldname):
         self._called('fieldname', fieldname)
 
-    def string_value(self, value):
-        self._called('string_value', value)
+    def string_value_part(self, bytes):
+        self._called('string_value_part', bytes)
+
+    def string_value_end(self, bytes):
+        self._called('string_value_end', bytes)
 
     def number_value(self, value):
         self._called('number_value', value)
@@ -84,13 +84,13 @@ class WhenParsingJson(unittest.TestCase):
 
     def test_read_flat_object_multiple_types(self):
         validator = EventValidator(self, {
-            'message_end': 6,
             'begin_object': 6,
             'end_object': 6,
             'begin_array': 0,
             'end_array':  0,
             'fieldname': 12,
-            'string_value': 6,
+            'string_value_part': 0,
+            'string_value_end': 6,
             'number_value': 3,
             'boolean_value': 2,
             'null_value': 1
@@ -101,13 +101,13 @@ class WhenParsingJson(unittest.TestCase):
 
     def test_read_nested_objects(self):
         validator = EventValidator(self, {
-            'message_end': 2,
             'begin_object': 4,
             'end_object': 4,
             'begin_array': 0,
             'end_array':  0,
             'fieldname': 10,
-            'string_value': 6,
+            'string_value_part': 0,
+            'string_value_end': 6,
             'number_value': 2,
             'boolean_value': 0,
             'null_value': 0
@@ -118,13 +118,13 @@ class WhenParsingJson(unittest.TestCase):
 
     def test_read_nested_arrays(self):
         validator = EventValidator(self, {
-            'message_end': 1,
             'begin_object': 0,
             'end_object': 0,
             'begin_array': 2,
             'end_array':  2,
             'fieldname': 0,
-            'string_value': 2,
+            'string_value_part': 0,
+            'string_value_end': 2,
             'number_value': 7,
             'boolean_value': 0,
             'null_value': 0
@@ -135,13 +135,13 @@ class WhenParsingJson(unittest.TestCase):
 
     def test_read_complex_nesting(self):
         validator = EventValidator(self, {
-            'message_end': 2,
             'begin_object': 6,
             'end_object': 6,
             'begin_array': 2,
             'end_array':  2,
             'fieldname': 12,
-            'string_value': 8,
+            'string_value_part': 0,
+            'string_value_end': 8,
             'number_value': 2,
             'boolean_value': 0,
             'null_value': 0
