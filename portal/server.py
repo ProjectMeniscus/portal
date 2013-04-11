@@ -8,35 +8,17 @@ import json
 
 from portal import PersistentProcess
 from portal.env import get_logger
+
 from portal.input.rfc5424 import SyslogParser, SyslogMessageHandler
+
+from  portal.input.json_stream import JsonEventHandler, JsonEventParser
+from  portal.input.json_stream_message import JsonMessageAssembler, JsonMessageHandler
 
 
 _LOG = get_logger('portal.server')
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 STOPSIGNALS = (signal.SIGINT, signal.SIGTERM)
-
-class MessageHandler(SyslogMessageHandler):
-
-    def __init__(self):
-        self.msg = b''
-        self.msg_head = None
-        self.msg_count = 0
-
-    def message_head(self, message_head):
-        self.msg_count += 1
-        self.msg_head = message_head
-
-    def message_part(self, message_part):
-        self.msg += message_part
-
-    def message_complete(self, last_message_part):
-#        if self.msg_count % 100000 == 0:
-        message_dict = self.msg_head.as_dict()
-        message_dict['message'] = (self.msg + last_message_part).decode('utf-8')
-        _LOG.debug('Message: {}'.format(json.dumps(message_dict)))
-        self.msg_head = None
-        self.msg = b''
 
 
 class SocketINetAddress(object):
@@ -91,7 +73,7 @@ class Connection(object):
 class Server(object):
 
     def __init__(self, address):
-        self.loop = pyev.default_loop()
+        self.loop = pyev.Loop()
         self.conns = weakref.WeakValueDictionary()
         self.watchers = list()
         self.address = address
@@ -155,13 +137,20 @@ class Server(object):
 
 class SyslogServer(Server):
 
-    def __init__(self, address):
+    def __init__(self, address, reader):
         super(SyslogServer, self).__init__(address)
+        self.reader = reader
 
     def new_reader(self):
-        return SyslogParser(MessageHandler())
+        return SyslogParser(self.reader)
 
 
-if __name__ == "__main__":
-    server = SyslogServer(("127.0.0.1", 5140))
-    server.start()
+class JsonStreamServer(Server):
+
+    def __init__(self, address, reader):
+        super(JsonStreamServer, self).__init__(address)
+        self.reader = reader
+
+    def new_reader(self):
+        return JsonEventParser(JsonMessageAssembler(self.reader))
+

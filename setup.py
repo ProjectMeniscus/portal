@@ -13,17 +13,8 @@ from Cython.Distutils import build_ext
 
 COMPILER_ARGS = ['-O2']
 
-setup(
-    cmdclass={'build_ext': build_ext},
-    ext_modules = [
-        Extension("portal.input.rfc5424",
-                  ["portal/input/rfc5424.pyx"],
-                  extra_compile_args=COMPILER_ARGS),
-        Extension("portal.input.json_stream",
-                  ["portal/input/json_stream.pyx"],
-                  extra_compile_args=COMPILER_ARGS)
-    ]
-)
+def sources_of(name):
+    return [name + '.pyx', name + '.c']
 
 setup(
     name = 'Meniscus Portal',
@@ -40,8 +31,19 @@ setup(
         "pyev"
     ],
     test_suite = 'nose.collector',
-    zip_safe=False,
-    include_package_data=True,
-    packages=find_packages(exclude=['ez_setup'])
+    zip_safe = False,
+    include_package_data = True,
+    packages = find_packages(exclude=['ez_setup']),
+    cmdclass = {
+        'build_ext': build_ext
+    },
+    ext_modules = [
+        Extension("portal.input.rfc5424",
+                  sources_of('portal/input/rfc5424'),
+                  extra_compile_args=COMPILER_ARGS),
+        Extension("portal.input.json_stream",
+                  sources_of('portal/input/json_stream'),
+                  extra_compile_args=COMPILER_ARGS)
+    ]
 )
 
