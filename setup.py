@@ -9,13 +9,54 @@ except ImportError:
 
 from distutils.core import setup
 from distutils.extension import Extension
-from Cython.Distutils import build_ext
+
+try:
+    from Cython.Compiler.Main import compile
+    from Cython.Distutils import build_ext
+    has_cython = True
+except ImportError:
+    has_cython = False
 
 COMPILER_ARGS = ['-O2']
+SOURCES = [
+    ('portal.input.json_stream', ['portal/input/json_stream.pyx', 'portal/input/json_stream.c']),
+    ('portal.input.rfc5424', ['portal/input/rfc5424.pyx', 'portal/input/rfc5424.c'])
+]
 
-def sources_of(name):
-    return [name + '.pyx']
+cmdclass = {}
+ext_modules = []
 
+def fendswith(varray, farray):
+    filtered = []
+    for value in varray:
+        for filter in farray:
+            if value.endswith(filter):
+                filtered.append(value)
+                break
+    return filtered
+
+def cythonize():
+    if has_cython:
+        cmdclass.update({
+            'build_ext': build_ext
+        })
+
+    for stuple in SOURCES:
+        if has_cython:
+            build_list = fendswith(stuple[1], ['.pyx', '.pyd'])
+            for build_target in build_list:
+                compile(build_target)
+            ext_modules.append(Extension(
+                stuple[0],
+                build_list,
+                extra_compile_args=COMPILER_ARGS))
+        else:
+            build_list = fendswith(varray, ['.c'])
+            ext_modules.append(Extension(
+                stuple[0],
+                build_list))
+
+cythonize()
 setup(
     name = 'Meniscus Portal',
     version = '0.1',
@@ -34,16 +75,7 @@ setup(
     zip_safe = False,
     include_package_data = True,
     packages = find_packages(exclude=['ez_setup']),
-    cmdclass = {
-        'build_ext': build_ext
-    },
-    ext_modules = [
-        Extension("portal.input.rfc5424",
-                  sources_of('portal/input/rfc5424'),
-                  extra_compile_args=COMPILER_ARGS),
-        Extension("portal.input.json_stream",
-                  sources_of('portal/input/json_stream'),
-                  extra_compile_args=COMPILER_ARGS)
-    ]
+    cmdclass = cmdclass,
+    ext_modules = ext_modules
 )
 
