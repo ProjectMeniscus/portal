@@ -14,7 +14,7 @@ from Cython.Distutils import build_ext
 COMPILER_ARGS = ['-O2']
 
 def sources_of(name):
-    return [name + '.pyx', name + '.c']
+    return [name + '.pyx']
 
 setup(
     name = 'Meniscus Portal',
