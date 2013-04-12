@@ -68,7 +68,6 @@ setup(
         "nose",
     ],
     install_requires=[
-        "cython",
         "pyev"
     ],
     test_suite = 'nose.collector',
