@@ -51,7 +51,7 @@ def cythonize():
                 build_list,
                 extra_compile_args=COMPILER_ARGS))
         else:
-            build_list = fendswith(varray, ['.c'])
+            build_list = fendswith(stuple[1], ['.c'])
             ext_modules.append(Extension(
                 stuple[0],
                 build_list))
