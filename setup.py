@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 try:
     from setuptools import setup, find_packages
+    from setuptools.command import easy_install
     from multiprocessing import util
 except ImportError:
     from ez_setup import use_setuptools
     use_setuptools()
     from setuptools import setup, find_packages
+    from setuptools.command import easy_install
 
 from distutils.core import setup
 from distutils.extension import Extension
@@ -25,6 +27,9 @@ SOURCES = [
 
 cmdclass = {}
 ext_modules = []
+
+def ez_install(package):
+    easy_install.main(["-U", package])
 
 def fendswith(varray, farray):
     filtered = []
@@ -56,6 +61,7 @@ def cythonize():
                 stuple[0],
                 build_list))
 
+ez_install('pyev')
 cythonize()
 setup(
     name = 'Meniscus Portal',
@@ -66,9 +72,6 @@ setup(
     tests_require=[
         "mock",
         "nose",
-    ],
-    install_requires=[
-        "pyev"
     ],
     test_suite = 'nose.collector',
     zip_safe = False,
