@@ -19,7 +19,7 @@ except ImportError:
 
 COMPILER_ARGS = ['-O2']
 SOURCES = [
-    ('portal.input.json_stream', ['portal/input/json_stream.pyx', 'portal/input/json_stream.c']),
+    ('portal.input.jsonep', ['portal/input/jsonep.pyx', 'portal/input/jsonep.c']),
     ('portal.input.rfc5424', ['portal/input/rfc5424.pyx', 'portal/input/rfc5424.c'])
 ]
 

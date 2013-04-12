@@ -11,8 +11,8 @@ from portal.env import get_logger
 
 from portal.input.rfc5424 import SyslogParser, SyslogMessageHandler
 
-from  portal.input.json_stream import JsonEventHandler, JsonEventParser
-from  portal.input.json_stream_message import JsonMessageAssembler, JsonMessageHandler
+from portal.input.jsonep import JsonEventHandler, JsonEventParser
+from portal.input.jsonstream import JsonMessageAssembler, JsonMessageHandler
 
 
 _LOG = get_logger('portal.server')

@@ -1,7 +1,7 @@
 import unittest
 import time
 
-from  portal.input.json_stream import JsonEventHandler, JsonEventParser
+from  portal.input.jsonep import JsonEventHandler, JsonEventParser
 
 
 PERFORMANCE_TEST = b'{ "header": "12345", "body": 12345.15 }{ "header": "12345", "body": 1234e+5 }{ "header": "12345", "body": -12345 }{ "header": "12345", "body": null }{ "header": "12345", "body": false }{ "header": "12345", "body": true }'

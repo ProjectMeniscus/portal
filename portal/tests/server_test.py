@@ -5,7 +5,7 @@ from multiprocessing import Process
 from portal.env import get_logger
 from portal.server import SyslogServer, JsonStreamServer
 from portal.input.rfc5424 import SyslogMessageHandler
-from portal.input.json_stream_message import JsonMessageHandler
+from portal.input.jsonstream import JsonMessageHandler
 
 
 _LOG = get_logger('portal.tests.server_test')

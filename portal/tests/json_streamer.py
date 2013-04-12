@@ -1,6 +1,7 @@
 import time
 import signal
 import socket
+import copy
 
 from portal.output.json import ObjectJsonWriter
 
@@ -11,13 +12,15 @@ HEADERS = {
     }
 }
 
-BODY = [
-    'testing',
-    {
-        'key': 'a',
-        'value': '12345'
-    }
-]
+BODY = {
+    'contents': [
+        'testing',
+        {
+            'key': 'a',
+            'value': '12345'
+        }
+    ]
+}
 
 TEST_DURATION = 10
 OUTPUT = str('Sent {} messages in {} seconds at a rate of {} messages/sec '
@@ -42,7 +45,7 @@ def run(sock):
         print(ex)
     finally:
         sock.close()
-    megs_sent = sent * 256 / 1024 / 1024
+    megs_sent = sent * 270 / 1024 / 1024
     print(OUTPUT.format(
         sent,
         TEST_DURATION,
@@ -51,8 +54,29 @@ def run(sock):
         megs_sent / TEST_DURATION))
 
 
-signal.signal(signal.SIGINT, exit_run)
+from pymongo import MongoClient
+import cProfile
+client = MongoClient('localhost', 27017)
+db = client['test']
+collection = db['test_collection']
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(('127.0.0.1', 9001))
-run(sock)
+def go():
+    then = time.time()
+    sent = 0
+    while time.time() - then < TEST_DURATION:
+        sent += 1
+        try:
+            collection.insert(BODY)
+            del BODY['_id']
+        except:
+            break
+    print('Inserted {} for {} per second'.format(sent, sent / TEST_DURATION))
+
+go()
+#cProfile.runctx('go()', globals(), locals())
+
+#signal.signal(signal.SIGINT, exit_run)
+
+#sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#sock.connect(('127.0.0.1', 9001))
+#run(sock)

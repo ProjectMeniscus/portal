@@ -3,8 +3,8 @@ import time
 
 from pprint import pprint
 
-from  portal.input.json_stream import JsonEventHandler, JsonEventParser
-from  portal.input.json_stream_message import JsonMessageAssembler, JsonMessageHandler
+from  portal.input.jsonep import JsonEventHandler, JsonEventParser
+from  portal.input.jsonstream import JsonMessageAssembler, JsonMessageHandler
 
 
 COMPLEX_NESTING = b'{"authentication": { "uid": "65c45346-436c-4f1d-8a02-7230fd570760", "token": "569e0670-e798-4e34-be65-23dbcfa81b73" }, "body": ["testing", { "key": "a", "value": 12345 }]}{"authentication": { "uid": "65c45346-436c-4f1d-8a02-7230fd570760", "token": "569e0670-e798-4e34-be65-23dbcfa81b73" }, "body": ["testing", { "key": "a", "value": 12345 }]}'

@@ -1,5 +1,5 @@
 
-from  portal.input.json_stream import JsonEventHandler, JsonEventParser
+from  portal.input.jsonep import JsonEventHandler, JsonEventParser
 
 
 class JsonMessageHandler(object):
