@@ -73,6 +73,9 @@ setup(
         "mock",
         "nose",
     ],
+    install_requires=[
+        "simplejson",
+    ],
     test_suite = 'nose.collector',
     zip_safe = False,
     include_package_data = True,
