@@ -448,8 +448,9 @@ cdef class JsonLexer(object):
     cdef void read_escaped_string(self, char next_byte):
         if is_escaped_code(next_byte):
             self.collect(unwrap_escape_code(next_byte))
+            self.escaped = False
         elif next_byte == ESCAPED_HEX_CODE:
-            self.consume()
+            self.escaped = False
 
     cdef void read_number_value(self, char next_byte):
         if is_number(next_byte):
