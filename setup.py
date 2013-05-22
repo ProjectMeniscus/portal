@@ -65,7 +65,7 @@ ez_install('pyev')
 cythonize()
 setup(
     name = 'Meniscus Portal',
-    version = '0.1',
+    version = '0.1.1',
     description = '',
     author = 'John Hopper',
     author_email='',
