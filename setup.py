@@ -19,10 +19,10 @@ try:
 except ImportError:
     has_cython = False
 
-COMPILER_ARGS = ['-O2']
 SOURCES = [
     ('portal.input.jsonep', ['portal/input/jsonep.pyx', 'portal/input/jsonep.c']),
-    ('portal.input.rfc5424', ['portal/input/rfc5424.pyx', 'portal/input/rfc5424.c'])
+    ('portal.input.rfc5424', ['portal/input/rfc5424.pyx', 'portal/input/rfc5424.c']),
+    ('portal.input.usyslog', ['portal/input/usyslog.pyx', 'portal/input/usyslog.c'])
 ]
 
 cmdclass = {}
@@ -53,16 +53,20 @@ def cythonize():
                 compile(build_target)
             ext_modules.append(Extension(
                 stuple[0],
-                build_list,
-                extra_compile_args=COMPILER_ARGS))
+                build_list))
         else:
             build_list = fendswith(stuple[1], ['.c'])
             ext_modules.append(Extension(
                 stuple[0],
                 build_list))
 
-ez_install('pyev')
+try:
+    import pyev
+except ImportError:
+    ez_install('pyev')
+
 cythonize()
+
 setup(
     name = 'Meniscus Portal',
     version = '0.1.1',
