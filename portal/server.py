@@ -9,7 +9,7 @@ import json
 from portal import PersistentProcess
 from portal.env import get_logger
 
-from portal.input.rfc5424 import SyslogParser, SyslogMessageHandler
+from portal.input.usyslog import Parser, SyslogMessageHandler
 
 from portal.input.jsonep import JsonEventHandler, JsonEventParser
 from portal.input.jsonstream import JsonMessageAssembler, JsonMessageHandler
@@ -142,7 +142,7 @@ class SyslogServer(Server):
         self.reader = reader
 
     def new_reader(self):
-        return SyslogParser(self.reader)
+        return Parser(self.reader)
 
 
 class JsonStreamServer(Server):
