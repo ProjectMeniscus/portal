@@ -69,7 +69,7 @@ cythonize()
 
 setup(
     name = 'Meniscus Portal',
-    version = '0.1.1',
+    version = '0.1.2',
     description = '',
     author = 'John Hopper',
     author_email='',
