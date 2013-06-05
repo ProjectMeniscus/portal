@@ -58,6 +58,7 @@ def cythonize():
                 compile(build_target)
         else:
             build_list = module_files(module, 'c')
+            print('Build list is: {}'.format(build_list))
 
         ext_modules.append(
             Extension(
