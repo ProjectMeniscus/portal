@@ -58,6 +58,7 @@ def cythonize():
                 compile(build_target)
         else:
             build_list = module_files(module, 'c')
+            print('Build list is: {}'.format(build_list))
 
         ext_modules.append(
             Extension(
@@ -75,7 +76,7 @@ cythonize()
 
 setup(
     name='Meniscus Portal',
-    version='0.1.4',
+    version='0.1.5',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
