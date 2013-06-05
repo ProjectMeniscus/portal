@@ -76,7 +76,7 @@ cythonize()
 
 setup(
     name='Meniscus Portal',
-    version='0.1.4',
+    version='0.1.5',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
