@@ -123,7 +123,8 @@ class Server(object):
             try:
                 sock, address = self.sock.accept()
                 sock.setblocking(0)
-                self.conns[address] = Connection(self.loop, self.new_reader(), sock, address)
+                self.conns[address] = Connection(
+                    self.loop, self.new_reader(), sock, address)
                 _LOG.debug('Accepted connection from: {}'.format(address))
             except socket.error as err:
                 if err.args[0] not in NONBLOCKING:
@@ -153,4 +154,3 @@ class JsonStreamServer(Server):
 
     def new_reader(self):
         return JsonEventParser(JsonMessageAssembler(self.reader))
-

@@ -14,6 +14,7 @@ OUTPUT = str('Sent {} messages in {} seconds at a rate of {} messages/sec '
 # Global to catch SIGINT
 continue_sending = True
 
+
 def exit_run():
     continue_sending = False
 

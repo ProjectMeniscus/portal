@@ -29,6 +29,7 @@ OUTPUT = str('Sent {} messages in {} seconds at a rate of {} messages/sec '
 # Global to catch SIGINT
 continue_sending = True
 
+
 def exit_run():
     continue_sending = False
 
@@ -60,6 +61,7 @@ client = MongoClient('localhost', 27017)
 db = client['test']
 collection = db['test_collection']
 
+
 def go():
     then = time.time()
     sent = 0
@@ -70,7 +72,8 @@ def go():
             del BODY['_id']
         except:
             break
-    print('Inserted {} for {} per second'.format(sent, sent / TEST_DURATION))
+    print('Inserted {} for {} per second'.format(
+        sent, sent / TEST_DURATION))
 
 go()
 #cProfile.runctx('go()', globals(), locals())

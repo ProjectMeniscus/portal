@@ -2,15 +2,11 @@
 try:
     from setuptools import setup, find_packages
     from setuptools.command import easy_install
-    from multiprocessing import util
 except ImportError:
     from ez_setup import use_setuptools
     use_setuptools()
     from setuptools import setup, find_packages
     from setuptools.command import easy_install
-
-from distutils.core import setup
-from distutils.extension import Extension
 
 try:
     from Cython.Compiler.Main import compile
@@ -19,26 +15,35 @@ try:
 except ImportError:
     has_cython = False
 
-SOURCES = [
-    ('portal.input.jsonep', ['portal/input/jsonep.pyx', 'portal/input/jsonep.c']),
-    ('portal.input.rfc5424', ['portal/input/rfc5424.pyx', 'portal/input/rfc5424.c']),
-    ('portal.input.usyslog', ['portal/input/usyslog.pyx', 'portal/input/usyslog.c'])
-]
+from os import path
+from distutils.core import setup
+from distutils.extension import Extension
 
-cmdclass = {}
-ext_modules = []
+
+C_LIBRARIES = list()
+cmdclass = dict()
+ext_modules = list()
+
+
+def read(relative):
+    contents = open(relative, 'r').read()
+    return [l for l in contents.split('\n') if l != '']
+
 
 def ez_install(package):
     easy_install.main(["-U", package])
 
-def fendswith(varray, farray):
-    filtered = []
-    for value in varray:
-        for filter in farray:
-            if value.endswith(filter):
-                filtered.append(value)
-                break
-    return filtered
+
+def module_files(module_name, *extensions):
+    found = list()
+    filename_base = module_name.replace('.', '/')
+    for extension in extensions:
+        filename = '{}.{}'.format(filename_base, extension)
+        if path.exists(filename):
+            found.append(filename)
+            break
+    return found
+
 
 def cythonize():
     if has_cython:
@@ -46,19 +51,20 @@ def cythonize():
             'build_ext': build_ext
         })
 
-    for stuple in SOURCES:
+    for module in read('./tools/cython-modules'):
         if has_cython:
-            build_list = fendswith(stuple[1], ['.pyx', '.pyd'])
+            build_list = module_files(module, 'pyx', 'pyd')
             for build_target in build_list:
                 compile(build_target)
-            ext_modules.append(Extension(
-                stuple[0],
-                build_list))
         else:
-            build_list = fendswith(stuple[1], ['.c'])
-            ext_modules.append(Extension(
-                stuple[0],
-                build_list))
+            build_list = module_files(module, 'c')
+
+        ext_modules.append(
+            Extension(
+                module,
+                build_list,
+                libraries=C_LIBRARIES))
+
 
 try:
     import pyev
@@ -68,23 +74,18 @@ except ImportError:
 cythonize()
 
 setup(
-    name = 'Meniscus Portal',
-    version = '0.1.2',
-    description = '',
-    author = 'John Hopper',
-    author_email='',
-    tests_require=[
-        "mock",
-        "nose",
-    ],
-    install_requires=[
-        "simplejson",
-    ],
-    test_suite = 'nose.collector',
-    zip_safe = False,
-    include_package_data = True,
-    packages = find_packages(exclude=['ez_setup']),
-    cmdclass = cmdclass,
-    ext_modules = ext_modules
+    name='portal',
+    version='0.1',
+    description='low level parsing bindings for meniscus',
+    author='John Hopper',
+    author_email='john.hopper@jpserver.net',
+    tests_require=read('./tools/test-requires'),
+    install_requires=read('./tools/pip-requires'),
+    test_suite='nose.collector',
+    zip_safe=False,
+    include_package_data=True,
+    packages=find_packages(exclude=['ez_setup']),
+    cmdclass=cmdclass,
+    ext_modules=ext_modules
 )
 
