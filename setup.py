@@ -74,8 +74,8 @@ except ImportError:
 cythonize()
 
 setup(
-    name='portal',
-    version='0.1',
+    name='Meniscus Portal',
+    version='0.1.3',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
