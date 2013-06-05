@@ -1,8 +1,19 @@
 import unittest
 import time
 
-from  portal.input.usyslog import SyslogMessageHandler, Parser
+from portal.input.usyslog import (
+    SyslogMessageHandler, Parser, ParsingError
+)
 
+
+BAD_OCTET_COUNT = (
+    b'2A <46>1 - tohru - 6611 - - start')
+
+TOO_LONG_OCTET_COUNT = (
+    b'9345395891038650918340698109386510938 <46>1 - tohru - 6611 - - start')
+
+SHORT_OCTET_COUNT = (
+    b'28 <46>1 - tohru - 6611 - - start')
 
 ACTUAL_MESSAGE = (
     b'158 <46>1 2013-04-02T14:12:04.873490-05:00 tohru rsyslogd - - - '
@@ -46,74 +57,143 @@ class MessageValidator(SyslogMessageHandler):
 
     def __init__(self, test):
         self.test = test
-        self.called = False
         self.times_called = 0
+        self.msg = ''
+        self.msg_head = None
+        self.caught_exception = None
+
+    @property
+    def called(self):
+        return self.times_called > 0
+
+    def call_received(self):
+        self.times_called += 1
+
+    def exception(self, ex):
+        self.caught_exception = ex
+        self.call_received()
+
+    def message_head(self, msg_head):
+        self.msg_head = msg_head
+        self.call_received()
+
+    def message_part(self, msg_part):
+        self.msg += msg_part
+
+    def message_complete(self, msg_part):
+        self.msg += msg_part
+
+    def validate(self):
+        self._validate(
+            self.test,
+            self.caught_exception,
+            self.msg_head,
+            self.msg)
+
+    def _validate(self, test, caught_exception, msg_head, msg):
+        raise NotImplementedError
 
 
 class ActualValidator(MessageValidator):
 
-    def message_head(self, msg_head):
-        self.called = True
-        self.times_called += 1
-        self.test.assertEqual('46', msg_head.priority)
-        self.test.assertEqual('1', msg_head.version)
-        self.test.assertEqual('2013-04-02T14:12:04.873490-05:00',
-            msg_head.timestamp)
-        self.test.assertEqual('tohru', msg_head.hostname)
-        self.test.assertEqual('rsyslogd', msg_head.appname)
-        self.test.assertEqual('-', msg_head.processid)
-        self.test.assertEqual('-', msg_head.messageid)
-        self.test.assertEqual(0, len(msg_head.sd))
+    def _validate(self, test, caught_exception, msg_head, msg):
+        test.assertEqual('46', msg_head.priority)
+        test.assertEqual('1', msg_head.version)
+        test.assertEqual('2013-04-02T14:12:04.873490-05:00',
+                         msg_head.timestamp)
+        test.assertEqual('tohru', msg_head.hostname)
+        test.assertEqual('rsyslogd', msg_head.appname)
+        test.assertEqual('-', msg_head.processid)
+        test.assertEqual('-', msg_head.messageid)
+        test.assertEqual(0, len(msg_head.sd))
 
 
 class HappyPathValidator(MessageValidator):
 
-    def message_head(self, msg_head):
-        self.called = True
-        self.times_called += 1
-        self.test.assertEqual('46', msg_head.priority)
-        self.test.assertEqual('1', msg_head.version)
-        self.test.assertEqual('2012-12-11T15:48:23.217459-06:00',
-            msg_head.timestamp)
-        self.test.assertEqual('tohru', msg_head.hostname)
-        self.test.assertEqual('rsyslogd', msg_head.appname)
-        self.test.assertEqual('6611', msg_head.processid)
-        self.test.assertEqual('12512', msg_head.messageid)
-        self.test.assertEqual(2, len(msg_head.sd))
+    def _validate(self, test, caught_exception, msg_head, msg):
+        test.assertEqual('46', msg_head.priority)
+        test.assertEqual('1', msg_head.version)
+        test.assertEqual('2012-12-11T15:48:23.217459-06:00',
+                         msg_head.timestamp)
+        test.assertEqual('tohru', msg_head.hostname)
+        test.assertEqual('rsyslogd', msg_head.appname)
+        test.assertEqual('6611', msg_head.processid)
+        test.assertEqual('12512', msg_head.messageid)
+        test.assertEqual(2, len(msg_head.sd))
+
+        # Unicode and python 2.x makes John cry
+        expected_sd = {
+            unicode('origin_1'): {
+                unicode('software'): b'rsyslogd',
+                unicode('swVersion'): b'7.2.2',
+                unicode('x-pid'): b'12297',
+                unicode('x-info'): b'http://www.rsyslog.com'
+            },
+            unicode('origin_2'): {
+                unicode('software'): b'rsyslogd',
+                unicode('swVersion'): b'7.2.2',
+                unicode('x-pid'): b'12297',
+                unicode('x-info'): b'http://www.rsyslog.com'
+            }
+        }
+
+        test.assertEqual(expected_sd, msg_head.sd)
 
 
 class MissingFieldsValidator(MessageValidator):
 
-    def message_head(self, msg_head):
-        self.called = True
-        self.times_called += 1
-        self.test.assertEqual('46', msg_head.priority)
-        self.test.assertEqual('1', msg_head.version)
-        self.test.assertEqual('-', msg_head.timestamp)
-        self.test.assertEqual('tohru', msg_head.hostname)
-        self.test.assertEqual('-', msg_head.appname)
-        self.test.assertEqual('6611', msg_head.processid)
-        self.test.assertEqual('-', msg_head.messageid)
-        self.test.assertEqual(2, len(msg_head.sd))
-
+    def _validate(self, test, caught_exception, msg_head, msg):
+        test.assertEqual('46', msg_head.priority)
+        test.assertEqual('1', msg_head.version)
+        test.assertEqual('-', msg_head.timestamp)
+        test.assertEqual('tohru', msg_head.hostname)
+        test.assertEqual('-', msg_head.appname)
+        test.assertEqual('6611', msg_head.processid)
+        test.assertEqual('-', msg_head.messageid)
+        test.assertEqual(2, len(msg_head.sd))
 
 
 class MissingSDValidator(MessageValidator):
 
-    def message_head(self, msg_head):
-        self.called = True
-        self.times_called += 1
-        self.test.assertEqual('46', msg_head.priority)
-        self.test.assertEqual('1', msg_head.version)
-        self.test.assertEqual('-', msg_head.timestamp)
-        self.test.assertEqual('tohru', msg_head.hostname)
-        self.test.assertEqual('-', msg_head.appname)
-        self.test.assertEqual('6611', msg_head.processid)
-        self.test.assertEqual('-', msg_head.messageid)
-        self.test.assertEqual(0, len(msg_head.sd))
+    def _validate(self, test, caught_exception, msg_head, msg):
+        test.assertEqual('46', msg_head.priority)
+        test.assertEqual('1', msg_head.version)
+        test.assertEqual('-', msg_head.timestamp)
+        test.assertEqual('tohru', msg_head.hostname)
+        test.assertEqual('-', msg_head.appname)
+        test.assertEqual('6611', msg_head.processid)
+        test.assertEqual('-', msg_head.messageid)
+        test.assertEqual(0, len(msg_head.sd))
 
 
 class WhenParsingSyslog(unittest.TestCase):
+
+    def test_bad_octet_count(self):
+        validator = MessageValidator(self)
+        parser = Parser(validator)
+
+        parser.read(BAD_OCTET_COUNT)
+        self.assertTrue(validator.called)
+        self.assertIsNotNone(validator.caught_exception)
+        self.assertEqual(ParsingError, type(validator.caught_exception))
+
+    def test_too_long_octet_count(self):
+        validator = MessageValidator(self)
+        parser = Parser(validator)
+
+        parser.read(TOO_LONG_OCTET_COUNT)
+        self.assertTrue(validator.called)
+        self.assertIsNotNone(validator.caught_exception)
+        self.assertEqual(ParsingError, type(validator.caught_exception))
+
+    def test_short_octet_count(self):
+        validator = MessageValidator(self)
+        parser = Parser(validator)
+
+        parser.read(SHORT_OCTET_COUNT)
+        self.assertTrue(validator.called)
+        self.assertIsNotNone(validator.caught_exception)
+        self.assertEqual(ParsingError, type(validator.caught_exception))
 
     def test_read_actual_message(self):
         validator = ActualValidator(self)
@@ -122,6 +202,7 @@ class WhenParsingSyslog(unittest.TestCase):
         parser.read(ACTUAL_MESSAGE)
         self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
+        validator.validate()
 
     def test_read_message_head(self):
         validator = HappyPathValidator(self)
@@ -130,6 +211,7 @@ class WhenParsingSyslog(unittest.TestCase):
         chunk_message(HAPPY_PATH_MESSAGE, parser)
         self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
+        validator.validate()
 
     def test_read_message_with_missing_fields(self):
         validator = MissingFieldsValidator(self)
@@ -138,6 +220,7 @@ class WhenParsingSyslog(unittest.TestCase):
         chunk_message(MISSING_FIELDS, parser)
         self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
+        validator.validate()
 
     def test_read_message_with_no_sd(self):
         validator = MissingSDValidator(self)
@@ -146,6 +229,7 @@ class WhenParsingSyslog(unittest.TestCase):
         chunk_message(NO_STRUCTURED_DATA, parser)
         self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
+        validator.validate()
 
     def test_read_messages_back_to_back(self):
         validator = ActualValidator(self)

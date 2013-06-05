@@ -1,5 +1,4 @@
-from libc.stdlib cimport realloc, malloc, free, atoi
-from libc.string cimport memset
+from libc.stdlib cimport malloc, free
 from cpython cimport bool
 
 
@@ -96,25 +95,11 @@ cdef inline int base10_add(int original, char b):
         return c
 
 
-def hand_off_message_head(delegate, message_head):
+def hand_off(delegate, delegate_func, arg):
     try:
-        delegate.message_head(message_head)
+        delegate_func(arg)
     except Exception as ex:
-        raise MessageHandlerError('Error during message head handoff.', ex)
-
-
-def hand_off_message_part(delegate, message_part):
-    try:
-        delegate.message_part(message_part)
-    except Exception as ex:
-        raise MessageHandlerError('Error during message part handoff.', ex)
-
-
-def hand_off_message_end(delegate, message_part):
-    try:
-        delegate.message_complete(message_part)
-    except Exception as ex:
-        raise MessageHandlerError('Error during message completion.', ex)
+        delegate.exception(ex)
 
 
 def raise_exception(int error_type):
@@ -161,6 +146,9 @@ class MessageHandlerError(SyslogError):
 
 
 class SyslogMessageHandler(object):
+
+    def exception(self, ex):
+        pass
 
     def message_head(self, message_head):
         pass
@@ -256,6 +244,12 @@ cdef class SyslogParser(object):
         self.syslog_msg.reset()
 
     cpdef read(self, object data):
+        try:
+            self._read(data)
+        except SyslogError as se:
+            self.msg_delegate.exception(se)
+
+    cdef _read(self, object data):
         cdef int datalen, index = 0
         cdef char* cdata
 
@@ -273,7 +267,7 @@ cdef class SyslogParser(object):
             self.lexer.next(cdata[index])
             if self.lexer.has_error():
                 try:
-                    raise_exception(self.lexer.error_type())
+                    raise_exception(self.lexer.get_error())
                 finally:
                     self.lexer.reset()
             if self.lexer.has_token():
@@ -307,14 +301,20 @@ cdef class SyslogParser(object):
             self.syslog_msg.set_sd_value(self.lexer.get_token())
         elif token_type == tc_message_part:
             self.handoff_head()
-            hand_off_message_part(self.msg_delegate, self.lexer.get_token())
+            hand_off(self.msg_delegate,
+                self.msg_delegate.message_part,
+                self.lexer.get_token())
         elif token_type == tc_last_message_part:
             self.handoff_head()
-            hand_off_message_end(self.msg_delegate, self.lexer.get_token())
+            hand_off(self.msg_delegate,
+                self.msg_delegate.message_complete,
+                self.lexer.get_token())
 
     cdef void handoff_head(self):
         if not self.head_handed_off:
-            hand_off_message_head(self.msg_delegate, self.syslog_msg)
+            hand_off(self.msg_delegate,
+                self.msg_delegate.message_head,
+                self.syslog_msg)
             self.head_handed_off = True
 
 
@@ -474,7 +474,7 @@ cdef class SyslogLexer(object):
     cdef void read_sd_value_end(self, char b):
         if b == CLOSE_BRACKET:
             self.state = ls_sd_end
-        else:
+        elif b != SPACE:
             self.collect(b)
             self.state = ls_sd_field_name
 

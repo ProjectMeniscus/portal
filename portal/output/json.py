@@ -1,5 +1,6 @@
 import simplejson as json
 
+
 class ObjectJsonWriter(object):
 
     def __init__(self):

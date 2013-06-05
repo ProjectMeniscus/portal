@@ -4,7 +4,7 @@ from multiprocessing import Process
 
 from portal.env import get_logger
 from portal.server import SyslogServer, JsonStreamServer
-from portal.input.rfc5424 import SyslogMessageHandler
+from portal.input.usyslog import SyslogMessageHandler
 from portal.input.jsonstream import JsonMessageHandler
 
 
@@ -25,6 +25,7 @@ class JsonHandler(JsonMessageHandler):
         self.msg_count += 1
         if self.msg_count % 10000 == 0:
             _LOG.debug('Processed {} messages.'.format(self.msg_count))
+
 
 class MessageHandler(SyslogMessageHandler):
 
