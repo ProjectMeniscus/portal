@@ -80,7 +80,7 @@ setup(
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
-    url='https://github.com/ProjectMeniscus/meniscus',
+    url='https://github.com/ProjectMeniscus/portal',
     license='Apache 2.0',
     classifiers=[
         'Development Status :: 4 - Beta',
