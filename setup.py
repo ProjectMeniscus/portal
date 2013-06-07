@@ -15,10 +15,12 @@ try:
 except ImportError:
     has_cython = False
 
+import sys
 from os import path
 from distutils.core import setup
 from distutils.extension import Extension
 
+IS_INSTALL = 'install' in sys.argv
 
 C_LIBRARIES = list()
 cmdclass = dict()
@@ -41,7 +43,6 @@ def module_files(module_name, *extensions):
         filename = '{}.{}'.format(filename_base, extension)
         if path.exists(filename):
             found.append(filename)
-            break
     return found
 
 
@@ -58,7 +59,6 @@ def cythonize():
                 compile(build_target)
         else:
             build_list = module_files(module, 'c')
-            print('Build list is: {}'.format(build_list))
 
         ext_modules.append(
             Extension(
@@ -66,20 +66,35 @@ def cythonize():
                 build_list,
                 libraries=C_LIBRARIES))
 
-
-try:
-    import pyev
-except ImportError:
-    ez_install('pyev')
+if IS_INSTALL:
+    try:
+        import pyev
+    except ImportError:
+        ez_install('pyev')
 
 cythonize()
 
 setup(
-    name='Meniscus Portal',
+    name='meniscus_portal',
     version='0.1.5',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
+    url='https://github.com/ProjectMeniscus/portal',
+    license='Apache 2.0',
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Natural Language :: English',
+        'Intended Audience :: Developers',
+        'Intended Audience :: System Administrators',
+        'Topic :: System :: Logging',
+        'Programming Language :: Python',
+        'Programming Language :: Cython',
+        'Programming Language :: Python :: Implementation :: CPython',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.3'
+    ],
     tests_require=read('./tools/test-requires'),
     install_requires=read('./tools/pip-requires'),
     test_suite='nose.collector',
@@ -87,6 +102,4 @@ setup(
     include_package_data=True,
     packages=find_packages(exclude=['ez_setup']),
     cmdclass=cmdclass,
-    ext_modules=ext_modules
-)
-
+    ext_modules=ext_modules)
