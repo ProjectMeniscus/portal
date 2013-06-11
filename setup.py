@@ -15,10 +15,14 @@ try:
 except ImportError:
     has_cython = False
 
+import sys
+
 from os import path
 from distutils.core import setup
 from distutils.extension import Extension
 
+
+INSTALLING = 'install' in sys.argv
 
 C_LIBRARIES = list()
 cmdclass = dict()
@@ -66,17 +70,17 @@ def cythonize():
                 build_list,
                 libraries=C_LIBRARIES))
 
-
-try:
-    import pyev
-except ImportError:
-    ez_install('pyev')
+if INSTALLING:
+    try:
+        import pyev
+    except ImportError:
+        ez_install('pyev')
 
 cythonize()
 
 setup(
     name='Meniscus Portal',
-    version='0.1.5',
+    version='0.1.6',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
