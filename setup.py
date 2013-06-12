@@ -20,7 +20,8 @@ from os import path
 from distutils.core import setup
 from distutils.extension import Extension
 
-IS_INSTALL = 'install' in sys.argv
+
+INSTALLING = 'install' in sys.argv
 
 C_LIBRARIES = list()
 cmdclass = dict()
@@ -66,7 +67,7 @@ def cythonize():
                 build_list,
                 libraries=C_LIBRARIES))
 
-if IS_INSTALL:
+if INSTALLING:
     try:
         import pyev
     except ImportError:
@@ -76,7 +77,7 @@ cythonize()
 
 setup(
     name='meniscus_portal',
-    version='0.1.5',
+    version='0.1.6',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
