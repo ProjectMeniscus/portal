@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-try:
-    from setuptools import setup, find_packages
-    from setuptools.command import easy_install
-except ImportError:
-    from ez_setup import use_setuptools
-    use_setuptools()
-    from setuptools import setup, find_packages
-    from setuptools.command import easy_install
+import sys
+import os
+
+from setuptools import setup, find_packages
+from setuptools.command import easy_install
+from distutils.extension import Extension
 
 try:
     from Cython.Compiler.Main import compile
@@ -15,25 +13,10 @@ try:
 except ImportError:
     has_cython = False
 
-import sys
-from os import path
-from distutils.core import setup
-from distutils.extension import Extension
-
-IS_INSTALL = 'install' in sys.argv
-
-C_LIBRARIES = list()
-cmdclass = dict()
-ext_modules = list()
-
 
 def read(relative):
     contents = open(relative, 'r').read()
     return [l for l in contents.split('\n') if l != '']
-
-
-def ez_install(package):
-    easy_install.main(["-U", package])
 
 
 def module_files(module_name, *extensions):
@@ -41,42 +24,57 @@ def module_files(module_name, *extensions):
     filename_base = module_name.replace('.', '/')
     for extension in extensions:
         filename = '{}.{}'.format(filename_base, extension)
-        if path.exists(filename):
+        if os.path.isfile(filename):
             found.append(filename)
     return found
 
 
+def fail_build(reason, code=1):
+    print(reason)
+    sys.exit(code)
+
+
 def cythonize():
-    if has_cython:
-        cmdclass.update({
-            'build_ext': build_ext
-        })
+    if not has_cython:
+        fail_build('In order to build this project, cython is required.')
 
     for module in read('./tools/cython-modules'):
         if has_cython:
-            build_list = module_files(module, 'pyx', 'pyd')
-            for build_target in build_list:
-                compile(build_target)
+            for cython_target in module_files(module, 'pyx', 'pyd'):
+                compile(cython_target)
+
+
+def package_c():
+    missing_modules = list()
+    extensions = list()
+
+    for module in read('./tools/cython-modules'):
+        c_files = module_files(module, 'c')
+        if len(c_files) > 0:
+            c_ext = Extension(module.replace('.', os.sep), c_files)
+            extensions.append(c_ext)
         else:
-            build_list = module_files(module, 'c')
+            missing_modules.append(module)
 
-        ext_modules.append(
-            Extension(
-                module,
-                build_list,
-                libraries=C_LIBRARIES))
+    if len(missing_modules) > 0:
+        fail_build('Missing C files for modules {}'.format(missing_modules))
+    return extensions
 
-if IS_INSTALL:
-    try:
-        import pyev
-    except ImportError:
-        ez_install('pyev')
+ext_modules = None
 
-cythonize()
+# This is a hack to prevent pyev and pip from screwing the build up
+if 'install' in sys.argv:
+    easy_install.main(["-U", 'pyev'])
+
+# Got tired of fighting build_ext
+if 'build' in sys.argv:
+    cythonize()
+
+ext_modules = package_c()
 
 setup(
-    name='meniscus_portal',
-    version='0.1.5',
+    name='meniscus-portal',
+    version='0.1.8',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
@@ -100,6 +98,5 @@ setup(
     test_suite='nose.collector',
     zip_safe=False,
     include_package_data=True,
-    packages=find_packages(exclude=['ez_setup']),
-    cmdclass=cmdclass,
+    packages=find_packages(exclude=['*.tests']),
     ext_modules=ext_modules)
