@@ -1,3 +1,3 @@
 cython
 simplejson
-pyev
+pyev<0.9.0
