@@ -62,12 +62,6 @@ def package_c():
 
 ext_modules = None
 
-IGNORE_SETUP_PY_INSTALL = 'NO_PYEV' in os.environ
-
-# This is a hack to prevent pyev and pip from screwing the build up
-if 'install' in sys.argv and not IGNORE_SETUP_PY_INSTALL:
-    easy_install.main(["-U", 'pyev<0.9.0'])
-
 # Got tired of fighting build_ext
 if 'build' in sys.argv:
     cythonize()
@@ -76,7 +70,7 @@ ext_modules = package_c()
 
 setup(
     name='meniscus-portal',
-    version='0.1.9.4',
+    version='0.1.9.8',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
