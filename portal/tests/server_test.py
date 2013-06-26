@@ -3,7 +3,7 @@ import simplejson as json
 from multiprocessing import Process
 
 from portal.env import get_logger
-from portal.server import SyslogServer, JsonStreamServer
+from portal.server import start_io, SyslogServer, JsonStreamServer
 from portal.input.usyslog import SyslogMessageHandler
 from portal.input.jsonstream import JsonMessageHandler
 
@@ -53,5 +53,6 @@ class MessageHandler(SyslogMessageHandler):
 if __name__ == "__main__":
     syslog_server = SyslogServer(("127.0.0.1", 5140), MessageHandler())
     json_server = JsonStreamServer(("127.0.0.1", 9001), JsonHandler())
-    Process(target=syslog_server.start).start()
-    Process(target=json_server.start).start()
+    syslog_server.start()
+    json_server.start()
+    start_io()

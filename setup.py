@@ -70,7 +70,7 @@ ext_modules = package_c()
 
 setup(
     name='meniscus-portal',
-    version='0.1.9.8',
+    version='0.2.0.0',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
