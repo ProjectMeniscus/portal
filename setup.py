@@ -51,7 +51,7 @@ def package_c():
     for module in read('./tools/cython-modules'):
         c_files = module_files(module, 'c')
         if len(c_files) > 0:
-            c_ext = Extension(module.replace('.', os.sep), c_files)
+            c_ext = Extension(module, c_files)
             extensions.append(c_ext)
         else:
             missing_modules.append(module)
@@ -70,7 +70,7 @@ ext_modules = package_c()
 
 setup(
     name='meniscus-portal',
-    version='0.2.0.0',
+    version='0.2.0.2',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',
