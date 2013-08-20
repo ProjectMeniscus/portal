@@ -2,10 +2,10 @@ build/
 dist/
 .coverage
 *.pyc
-*.c
 *.so
 .idea
 *.egg-info/
+portal/input/*.c
 *~
 #*
 .tox
