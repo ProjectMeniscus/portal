@@ -25,7 +25,8 @@ typedef int (*syslog_data_cb) (syslog_parser *parser, const char *at, size_t len
 enum flags {
     F_RFC_3164       = 1 << 0,
     F_RFC_5424       = 1 << 1,
-    F_OCTET_COUNTING = 1 << 2
+    F_ESCAPED        = 1 << 2,
+    F_COUNT_OCTETS   = 1 << 3
 };
 
 enum USYSLOG_ERROR {
@@ -33,6 +34,8 @@ enum USYSLOG_ERROR {
     SLERR_BAD_OCTET_COUNT = 2,
     SLERR_BAD_PRIORITY_START = 3,
     SLERR_BAD_PRIORITY = 3,
+    SLERR_BAD_VERSION = 4,
+    SLERR_BAD_SD_START = 5,
 
     SLERR_BAD_STATE = 100,
 
@@ -48,13 +51,25 @@ struct pbuffer {
 };
 
 struct syslog_msg_head {
-    unsigned char pri;
-    unsigned char version;
+    // Numeric Fields
+    unsigned short pri;
+    unsigned short version;
+
+    // String Fields
     char *timestamp;
+    size_t timestamp_len;
+
     char *hostname;
+    size_t hostname_len;
+
     char *appname;
-    char *proc_id;
-    char *msg_id;
+    size_t appname_len;
+
+    char *procid;
+    size_t procid_len;
+
+    char *msgid;
+    size_t msgid_len;
 };
 
 struct syslog_parser_settings {
@@ -74,12 +89,10 @@ struct syslog_parser {
     unsigned char state;
 
     // Error
-    const char * error_msg;
     unsigned char error;
 
     // Message head
     struct syslog_msg_head *msg_head;
-
 
     // Byte tracking fields
     uint64_t message_length;
@@ -95,9 +108,9 @@ struct syslog_parser {
 
 // Functions
 void uslg_parser_reset(syslog_parser *parser);
-void uslg_parser_init(syslog_parser *parser);
 void uslg_free_parser(syslog_parser *parser);
 
+int uslg_parser_init(syslog_parser *parser, void *app_data);
 
 #ifdef __cplusplus
 }
