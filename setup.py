@@ -2,6 +2,8 @@
 import sys
 import os
 
+import portal.input.syslog as syslog
+
 from setuptools import setup, find_packages
 from setuptools.command import easy_install
 from distutils.extension import Extension
@@ -67,6 +69,7 @@ if 'build' in sys.argv:
     cythonize()
 
 ext_modules = package_c()
+ext_modules.append(syslog.ffi.verifier.get_extension())
 
 setup(
     name='meniscus-portal',

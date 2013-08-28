@@ -9,17 +9,13 @@ extern "C" {
 #include <sys/types.h>
 
 
-// Type definitions
 typedef struct pbuffer pbuffer;
 typedef struct syslog_parser syslog_parser;
 typedef struct syslog_msg_head syslog_msg_head;
 typedef struct syslog_parser_settings syslog_parser_settings;
 
 typedef int (*syslog_cb) (syslog_parser *parser);
-typedef int (*syslog_head_cb) (syslog_parser *parser, syslog_msg_head *msg_head);
 typedef int (*syslog_data_cb) (syslog_parser *parser, const char *at, size_t len);
-
-
 
 // Enumerations
 enum flags {
@@ -28,6 +24,7 @@ enum flags {
     F_ESCAPED        = 1 << 2,
     F_COUNT_OCTETS   = 1 << 3
 };
+
 
 enum USYSLOG_ERROR {
     SLERR_UNCAUGHT = 1,
@@ -52,7 +49,7 @@ struct pbuffer {
 
 struct syslog_msg_head {
     // Numeric Fields
-    unsigned short pri;
+    unsigned short priority;
     unsigned short version;
 
     // String Fields
@@ -65,11 +62,11 @@ struct syslog_msg_head {
     char *appname;
     size_t appname_len;
 
-    char *procid;
-    size_t procid_len;
+    char *processid;
+    size_t processid_len;
 
-    char *msgid;
-    size_t msgid_len;
+    char *messageid;
+    size_t messageid_len;
 };
 
 struct syslog_parser_settings {
@@ -84,7 +81,7 @@ struct syslog_parser_settings {
 
 struct syslog_parser {
     // Parser fields
-    unsigned char flags : 3;
+    unsigned char flags : 4;
     unsigned char token_state;
     unsigned char state;
 
@@ -96,7 +93,7 @@ struct syslog_parser {
 
     // Byte tracking fields
     uint64_t message_length;
-    uint64_t read;
+    uint64_t remaining;
 
     // Buffer
     pbuffer *buffer;
@@ -105,12 +102,12 @@ struct syslog_parser {
     void *app_data;
 };
 
-
 // Functions
 void uslg_parser_reset(syslog_parser *parser);
 void uslg_free_parser(syslog_parser *parser);
 
 int uslg_parser_init(syslog_parser *parser, void *app_data);
+int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length);
 
 #ifdef __cplusplus
 }

@@ -27,13 +27,14 @@
 #define IS_HOST_CHAR(c) (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '_')
 
 
-enum token_state {
+typedef enum {
     ts_before,
     ts_read
-};
+} token_state;
+
 
 // States
-enum syslog_state {
+typedef enum {
 
     // Message Head
     s_msg_start,
@@ -44,8 +45,8 @@ enum syslog_state {
     s_timestamp,
     s_hostname,
     s_appname,
-    s_procid,
-    s_msgid,
+    s_processid,
+    s_messageid,
 
     // RFC5424 - SDATA
     s_sd_start,
@@ -60,17 +61,13 @@ enum syslog_state {
     // Message Content
     s_message,
     s_msg_complete
-};
+} syslog_state;
 
-enum syslog_retval {
+typedef enum {
     rv_advance,
     rv_rehash,
-    rv_inc_index,
-    rv_error
-};
-
-typedef enum syslog_state syslog_state;
-typedef enum syslog_retval syslog_retval;
+    rv_inc_index
+} syslog_retval;
 
 
 // Supporting functions
@@ -127,12 +124,12 @@ void free_msg_head(syslog_msg_head *head) {
         free(head->hostname);
     }
 
-    if (head->procid != NULL) {
-        free(head->procid);
+    if (head->processid != NULL) {
+        free(head->processid);
     }
 
-    if (head->msgid != NULL) {
-        free(head->msgid);
+    if (head->messageid != NULL) {
+        free(head->messageid);
     }
 
     free(head);
@@ -191,19 +188,65 @@ int on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
     return cb(parser, parser->buffer->bytes, parser->buffer->position);
 }
 
-void set_token_state(syslog_parser *parser, enum token_state next_state) {
+void set_token_state(syslog_parser *parser, token_state next_state) {
 // Print the state switch if we're compiled in DEBUG mode
 #if DEBUG_OUTPUT
-    printf("Setting token state to: %i", next_state);
+    printf("Setting token state to: %i\n", next_state);
 #endif
 
     parser->token_state = next_state;
 }
 
+char * get_state_name(syslog_state state) {
+    switch (state) {
+        case s_msg_start:
+            return "msg_start";
+        case s_octet_count:
+            return "octet_count";
+        case s_priority_start:
+            return "priority_start";
+        case s_priority:
+            return "priority";
+        case s_version:
+            return "version";
+        case s_timestamp:
+            return "timestamp";
+        case s_hostname:
+            return "hostname";
+        case s_appname:
+            return "appname";
+        case s_processid:
+            return "processid";
+        case s_messageid:
+            return "messageid";
+        case s_sd_start:
+            return "sd_start";
+        case s_sd_element:
+            return "sd_element";
+        case s_sd_field:
+            return "sd_field";
+        case s_sd_field_end:
+            return "sd_field_end";
+        case s_sd_value_begin:
+            return "sd_value_begin";
+        case s_sd_value:
+            return "sd_value";
+        case s_sd_end:
+            return "sd_end";
+        case s_message:
+            return "message";
+        case s_msg_complete:
+            return "msg_complete";
+
+        default:
+            return "NOT A STATE";
+    }
+}
+
 void set_state(syslog_parser *parser, syslog_state next_state) {
 // Print the state switch if we're compiled in DEBUG mode
 #if DEBUG_OUTPUT
-    printf("Setting state to: %i", next_state);
+    printf("Setting state to: %s\n", get_state_name(next_state));
 #endif
 
     parser->state = next_state;
@@ -230,14 +273,14 @@ void set_str_field(syslog_parser *parser) {
             parser->msg_head->appname_len = len;
             break;
 
-        case s_procid:
-            parser->msg_head->procid = value;
-            parser->msg_head->procid_len = len;
+        case s_processid:
+            parser->msg_head->processid = value;
+            parser->msg_head->processid_len = len;
             break;
 
-        case s_msgid:
-            parser->msg_head->msgid = value;
-            parser->msg_head->msgid_len = len;
+        case s_messageid:
+            parser->msg_head->messageid = value;
+            parser->msg_head->messageid_len = len;
             break;
 
         default:
@@ -249,15 +292,15 @@ void set_str_field(syslog_parser *parser) {
 
 int read_message(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
     if (parser->flags & F_COUNT_OCTETS) {
-        if (parser->message_length >= length) {
+        if (parser->remaining >= length) {
             parser->error = settings->on_msg(parser, data, length);
-            parser->read = length;
+            parser->remaining -= length;
         } else {
             parser->error = settings->on_msg(parser, data, parser->message_length);
-            parser->read = parser->message_length;
+            parser->remaining = 0;
         }
 
-        if (parser->message_length == 0) {
+        if (parser->remaining == 0) {
             set_state(parser, s_msg_complete);
         }
     } else {
@@ -271,15 +314,13 @@ int read_message(syslog_parser *parser, const syslog_parser_settings *settings, 
         }
 
         parser->error = settings->on_msg(parser, data, stop_idx);
-        parser->read = stop_idx;
+        parser->remaining -= stop_idx;
     }
 
     return rv_inc_index;
 }
 
 int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    int retval = rv_advance;
-
     switch (nb) {
         case '\\':
             parser->flags |= F_ESCAPED;
@@ -289,7 +330,7 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
             if (parser->flags & F_ESCAPED) {
                 parser->flags |= F_ESCAPED;
             } else {
-                retval = on_data_cb(parser, settings->on_sd_value);
+                parser->error = on_data_cb(parser, settings->on_sd_value);
                 set_state(parser, s_sd_field);
             }
             break;
@@ -297,6 +338,8 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
         default:
             store_byte(nb, parser);
     }
+
+    return rv_advance;
 }
 
 int sd_value_begin(syslog_parser *parser, char nb) {
@@ -394,7 +437,7 @@ int version(syslog_parser *parser, char nb) {
     int retval = rv_advance;
 
     if (IS_NUM(nb)) {
-        uint8_t nversion = parser->message_length;
+        uint16_t nversion = parser->msg_head->version;
         nversion *= 10;
         nversion += nb - '0';
 
@@ -412,14 +455,14 @@ int version(syslog_parser *parser, char nb) {
 
 int priority(syslog_parser *parser, char nb) {
     if (IS_NUM(nb)) {
-        uint8_t npri = parser->message_length;
-        npri *= 10;
-        npri += nb - '0';
+        uint16_t npriority = parser->msg_head->priority;
+        npriority *= 10;
+        npriority += nb - '0';
 
-        if (npri < parser->msg_head->pri || npri > 999) {
+        if (npriority < parser->msg_head->priority || npriority > 999) {
             parser->error = SLERR_BAD_PRIORITY;
         } else {
-            parser->msg_head->pri = npri;
+            parser->msg_head->priority = npriority;
         }
     } else {
         switch (nb) {
@@ -449,6 +492,8 @@ int priority_start(syslog_parser *parser, char nb) {
 }
 
 int octet_count(syslog_parser *parser, char nb) {
+    int retval = rv_advance;
+
     if (IS_NUM(nb)) {
         uint64_t mlength = parser->message_length;
 
@@ -461,15 +506,19 @@ int octet_count(syslog_parser *parser, char nb) {
             parser->message_length = mlength;
         }
     } else {
+        parser->flags |= F_COUNT_OCTETS;
+        parser->remaining = parser->message_length + 1;
         set_state(parser, s_priority_start);
+        retval = rv_rehash;
     }
 
-    return rv_advance;
+    return retval;
 }
 
 int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
+    parser->error = on_cb(parser, settings->on_msg_begin);
+
     if (IS_NUM(nb)) {
-        parser->flags |= F_COUNT_OCTETS;
         set_state(parser, s_octet_count);
     } else {
         set_state(parser, s_priority);
@@ -480,12 +529,13 @@ int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, cha
 
 // Big state switch
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
-    int action, d_index;
+    int action = rv_advance, d_index;
     bool exit_exec = false;
 
     // Continue in the loop as long as we're told not to exit and there's data to chew on
     for (d_index = 0; !exit_exec && d_index < length; d_index++) {
         char next_byte = data[d_index];
+        uint64_t last_remaining = parser->remaining;
 
 #if DEBUG_OUTPUT
         // Get the next character being processed during debug
@@ -497,10 +547,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
             switch (next_byte) {
                 case ' ':
                 case '\t':
-                    // Decrease the message length if we're counting octets
-                    if (parser->flags & F_COUNT_OCTETS) {
-                        parser->message_length--;
-                    }
+                    parser->remaining--;
                     continue;
 
                 default:
@@ -538,14 +585,14 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
                 break;
 
             case s_appname:
-                action = parse_msg_head_part(parser, s_procid, next_byte);
+                action = parse_msg_head_part(parser, s_processid, next_byte);
                 break;
 
-            case s_procid:
-                action = parse_msg_head_part(parser, s_msgid, next_byte);
+            case s_processid:
+                action = parse_msg_head_part(parser, s_messageid, next_byte);
                 break;
 
-            case s_msgid:
+            case s_messageid:
                 action = parse_msg_head_part(parser, s_sd_start, next_byte);
                 break;
 
@@ -584,26 +631,28 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
         if (parser->error) {
             // An error occured
             exit_exec = true;
+            break;
+        } else if (parser->state == s_msg_complete) {
+            parser->error = on_cb(parser, settings->on_msg_complete);
         }
 
         switch (action) {
             case rv_advance:
-                if (parser->state == s_msg_complete) {
+                if (parser->state != s_msg_complete) {
+                    parser->remaining--;
+                } else {
                     parser->error = on_cb(parser, settings->on_msg_complete);
                     uslg_parser_reset(parser);
                 }
                 break;
 
             case rv_inc_index:
-                d_index += parser->read;
+                d_index += (last_remaining - parser->remaining);
                 break;
 
             case rv_rehash:
                 d_index--;
                 break;
-
-            default:
-                exit_exec = true;
         }
     }
 
@@ -614,7 +663,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
 // Exported Functions
 
 void uslg_parser_reset(syslog_parser *parser) {
-    parser->read = 0;
+    parser->remaining = 0;
     parser->error = 0;
     parser->flags = 0;
     parser->message_length = 0;
