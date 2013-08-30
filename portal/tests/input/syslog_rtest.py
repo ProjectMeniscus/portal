@@ -56,8 +56,8 @@ class MessageValidator(SyslogMessageHandler):
     def message_part(self, msg_part):
         self.msg += msg_part
 
-    def message_complete(self, msg_part):
-        self.msg += msg_part
+    def message_complete(self):
+        pass
 
     def validate(self):
         self._validate(
@@ -82,6 +82,10 @@ class ActualValidator(MessageValidator):
         test.assertEqual('-', msg_head.processid)
         test.assertEqual('-', msg_head.messageid)
         test.assertEqual(0, len(msg_head.sd))
+        test.assertEqual(('127.0.0.1 - - [12/Jul/2013:19:40:58 +0000] '
+                          '"GET /test.html HTTP/1.1" 404 466 "-" '
+                          '"curl/7.29.0"'), msg)
+
 
 
 class WhenParsingSyslog(unittest.TestCase):

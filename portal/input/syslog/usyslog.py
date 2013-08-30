@@ -249,14 +249,15 @@ def on_msg(parser, data, size):
     part = ffi.string(data, size)
     print part
     print size
+    parser_data = ffi.from_handle(parser.app_data)
+    parser_data.msg_handler.message_part(part)
     return 0
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
     print('on_msg_complete')
     parser_data = ffi.from_handle(parser.app_data)
-
-    #parser_data.msg_handler.message_complete()
+    parser_data.msg_handler.message_complete()
     return 0
 
 
