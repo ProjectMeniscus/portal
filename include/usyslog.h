@@ -9,6 +9,7 @@ extern "C" {
 #include <sys/types.h>
 
 
+// Typedefs
 typedef struct pbuffer pbuffer;
 typedef struct syslog_parser syslog_parser;
 typedef struct syslog_msg_head syslog_msg_head;
@@ -16,6 +17,7 @@ typedef struct syslog_parser_settings syslog_parser_settings;
 
 typedef int (*syslog_cb) (syslog_parser *parser);
 typedef int (*syslog_data_cb) (syslog_parser *parser, const char *data, size_t len);
+
 
 // Enumerations
 enum flags {
@@ -51,8 +53,8 @@ struct pbuffer {
 
 struct syslog_msg_head {
     // Numeric Fields
-    unsigned short priority;
-    unsigned short version;
+    uint16_t priority;
+    uint16_t version;
 
     // String Fields
     char *timestamp;
@@ -94,8 +96,9 @@ struct syslog_parser {
     struct syslog_msg_head *msg_head;
 
     // Byte tracking fields
-    uint64_t message_length;
-    uint64_t remaining;
+    uint32_t message_length;
+    uint32_t octets_remaining;
+    uint32_t octets_read;
 
     // Buffer
     pbuffer *buffer;

@@ -64,8 +64,9 @@ struct syslog_parser {
     struct syslog_msg_head *msg_head;
 
     // Byte tracking fields
-    uint64_t message_length;
-    uint64_t remaining;
+    uint32_t message_length;
+    uint32_t octets_remaining;
+    uint32_t octets_read;
 
     // Buffer
     pbuffer *buffer;

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -13,29 +12,20 @@
 #define RFC5424_MAX_BYTES       2048
 #define MAX_BUFFER_SIZE         (RFC5424_MAX_BYTES * 32)
 
-#ifndef ULLONG_MAX
-#   define ULLONG_MAX ((uint64_t) -1)   // 2^64-1
-#endif
-
 #define IS_WS(c)            (c ==' ' || c == '\t' || c == '\r' || c == '\n')
-
 #define LOWER(c)            (unsigned char)(c | 0x20)
 #define IS_ALPHA(c)         (LOWER(c) >= 'a' && LOWER(c) <= 'z')
 #define IS_NUM(c)           ((c) >= '0' && (c) <= '9')
 #define IS_ALPHANUM(c)      (IS_ALPHA(c) || IS_NUM(c))
 
-#define IS_HOST_CHAR(c) (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '_')
 
-
+// Typedefs
 typedef enum {
     ts_before,
     ts_read
 } token_state;
 
-
-// States
 typedef enum {
-
     // Message Head
     s_msg_start,
     s_octet_count,
@@ -59,8 +49,7 @@ typedef enum {
     s_sd_end,
 
     // Message Content
-    s_message,
-    s_msg_complete
+    s_message
 } syslog_state;
 
 typedef enum {
@@ -237,8 +226,6 @@ char * get_state_name(syslog_state state) {
             return "sd_end";
         case s_message:
             return "message";
-        case s_msg_complete:
-            return "msg_complete";
 
         default:
             return "NOT A STATE";
@@ -293,33 +280,33 @@ void set_str_field(syslog_parser *parser) {
 }
 
 int read_message(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
+    bool msg_complete = false;
+    int retval = rv_advance;
+    int read;
+
     if (parser->flags & F_COUNT_OCTETS) {
-        if (parser->remaining >= length) {
-            parser->error = settings->on_msg(parser, data, length);
-            parser->remaining -= length;
-        } else {
-            parser->error = settings->on_msg(parser, data, parser->message_length);
-            parser->remaining = 0;
-        }
-
-        if (parser->remaining == 0) {
-            set_state(parser, s_msg_complete);
-        }
+        read = parser->octets_remaining >= length ? length : parser->octets_remaining;
+        parser->octets_remaining -= read;
+        msg_complete = parser->octets_remaining == 0;
     } else {
-        int stop_idx;
-
-        for (stop_idx = 0; stop_idx < length; stop_idx++) {
-            if (data[stop_idx] == '\n') {
-                set_state(parser, s_msg_complete);
+        for (read = 0; read < length; read++) {
+            if (data[read] == '\n') {
+                msg_complete = true;
                 break;
             }
         }
-
-        parser->error = settings->on_msg(parser, data, stop_idx);
-        parser->remaining -= stop_idx;
     }
 
-    return rv_inc_index;
+    if (read > 0) {
+        parser->error = settings->on_msg(parser, data, read);
+        retval = rv_inc_index;
+    }
+
+    if (!parser->error && msg_complete) {
+        parser->error = on_cb(parser, settings->on_msg_complete);
+    }
+
+    return retval;
 }
 
 int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
@@ -358,11 +345,14 @@ int sd_value_start(syslog_parser *parser, char nb) {
 }
 
 int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    if (nb == '=') {
-        parser->error = on_data_cb(parser, settings->on_sd_field);
-        set_state(parser, s_sd_value_start);
-    } else {
-        store_byte(nb, parser);
+    switch (nb) {
+        case '=':
+            parser->error = on_data_cb(parser, settings->on_sd_field);
+            set_state(parser, s_sd_value_start);
+            break;
+
+        default:
+            store_byte(nb, parser);
     }
 
     return rv_advance;
@@ -492,21 +482,23 @@ int octet_count(syslog_parser *parser, char nb) {
     int retval = rv_advance;
 
     if (IS_NUM(nb)) {
-        uint64_t mlength = parser->message_length;
+        uint32_t mlength = parser->message_length;
 
         mlength *= 10;
         mlength += nb - '0';
 
-        if (mlength < parser->message_length || mlength == ULONG_MAX) {
+        if (mlength < parser->message_length || mlength == UINT_MAX) {
             parser->error = SLERR_BAD_OCTET_COUNT;
         } else {
             parser->message_length = mlength;
         }
-    } else {
+    } else if (IS_WS(nb)) {
         parser->flags |= F_COUNT_OCTETS;
-        parser->remaining = parser->message_length + 1;
+        parser->octets_remaining = parser->message_length + 1;
         set_state(parser, s_priority_start);
         retval = rv_rehash;
+    } else {
+        parser->error = SLERR_BAD_OCTET_COUNT;
     }
 
     return retval;
@@ -527,15 +519,12 @@ int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, cha
 // Big state switch
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
     int action = rv_advance, d_index;
-    bool exit_exec = false;
 
-    // Continue in the loop as long as we're told not to exit and there's data to chew on
-    for (d_index = 0; !exit_exec && d_index < length; d_index++) {
+    for (d_index = 0; d_index < length; d_index++) {
         char next_byte = data[d_index];
-        uint64_t last_remaining = parser->remaining;
+        uint32_t last_remaining = parser->octets_remaining;
 
 #if DEBUG_OUTPUT
-        // Get the next character being processed during debug
         printf("Next byte: %c\n", next_byte);
 #endif
 
@@ -544,7 +533,9 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
             switch (next_byte) {
                 case ' ':
                 case '\t':
-                    parser->remaining--;
+                    if (parser->flags & F_COUNT_OCTETS) {
+                        parser->octets_remaining--;
+                    }
                     continue;
 
                 default:
@@ -552,6 +543,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
             }
         }
 
+        // Parser state
         switch (parser->state) {
             case s_msg_start:
                 action = msg_start(parser, settings, next_byte);
@@ -625,26 +617,21 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
                 parser->error = SLERR_BAD_STATE;
         }
 
+        // Upon error, exit the read loop regardless of action
         if (parser->error) {
-            // An error occured
-            exit_exec = true;
             break;
-        } else if (parser->state == s_msg_complete) {
-            parser->error = on_cb(parser, settings->on_msg_complete);
         }
 
+        // What action should be taken for this byte
         switch (action) {
             case rv_advance:
-                if (parser->state != s_msg_complete) {
-                    parser->remaining--;
-                } else {
-                    parser->error = on_cb(parser, settings->on_msg_complete);
-                    uslg_parser_reset(parser);
+                if (parser->flags & F_COUNT_OCTETS) {
+                    parser->octets_remaining--;
                 }
                 break;
 
             case rv_inc_index:
-                d_index += (last_remaining - parser->remaining);
+                d_index += (last_remaining - parser->octets_remaining);
                 break;
 
             case rv_rehash:
@@ -660,7 +647,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
 // Exported Functions
 
 void uslg_parser_reset(syslog_parser *parser) {
-    parser->remaining = 0;
+    parser->octets_remaining = 0;
     parser->error = 0;
     parser->flags = 0;
     parser->message_length = 0;
