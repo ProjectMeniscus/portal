@@ -47,7 +47,7 @@ struct syslog_parser_settings {
     syslog_data_cb    on_sd_element;
     syslog_data_cb    on_sd_field;
     syslog_data_cb    on_sd_value;
-    syslog_data_cb    on_msg;
+    syslog_data_cb    on_msg_part;
     syslog_cb         on_msg_complete;
 };
 
@@ -126,13 +126,17 @@ class MessageHandlerError(SyslogError):
 
 class SyslogMessageHandler(object):
 
-    def message_head(self, message_head):
+    def __init__(self):
+        self.msg = ''
+        self.msg_head = None
+
+    def on_msg_head(self, message_head):
         pass
 
-    def message_part(self, message_part):
+    def on_msg_part(self, message_part):
         pass
 
-    def message_complete(self, message_part):
+    def on_msg_complete(self, message_part):
         pass
 
 
@@ -160,8 +164,8 @@ class SyslogMessageHead(object):
         self.current_sde = dict()
         self.sd[sd_name] = self.current_sde
 
-    def set_sd_field(self, sd_fieldname):
-        self.current_sd_field = sd_fieldname
+    def set_sd_field(self, sd_field_name):
+        self.current_sd_field = sd_field_name
 
     def set_sd_value(self, value):
         self.current_sde[self.current_sd_field] = value
@@ -192,73 +196,88 @@ def on_msg_begin(parser):
     print('on_msg_begin')
     return 0
 
-@ffi.callback("int (syslog_parser *parser)")
-def on_msg_head(parser):
-    parser_data = ffi.from_handle(parser.app_data)
-    msg_head = SyslogMessageHead()
-
-    msg_head.priority = str(parser.msg_head.priority)
-    msg_head.version = str(parser.msg_head.version)
-    msg_head.timestamp = ffi.string(
-        parser.msg_head.timestamp,
-        parser.msg_head.timestamp_len)
-    msg_head.hostname = ffi.string(
-        parser.msg_head.hostname,
-        parser.msg_head.hostname_len)
-    msg_head.appname = ffi.string(
-        parser.msg_head.appname,
-        parser.msg_head.appname_len)
-    msg_head.processid = ffi.string(
-        parser.msg_head.processid,
-        parser.msg_head.processid_len)
-    msg_head.messageid = ffi.string(
-        parser.msg_head.messageid,
-        parser.msg_head.messageid_len)
-
-    parser_data.msg_handler.message_head(msg_head)
-
-    return 0
-
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_element(parser, data, size):
-    print('on_sd_element')
-    part = ffi.string(data, size)
-    print part
-    print size
-    return 0
+    try:
+        parser_data = ffi.from_handle(parser.app_data)
+        msg_head = parser_data.msg_head
+        sd_element = ffi.string(data, size)
+        msg_head.create_sde(sd_element)
+        return 0
+    except Exception:
+        return 1
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_field(parser, data, size):
-    print('on_sd_field')
-    part = ffi.string(data, size)
-    print part
-    print size
-    return 0
+    try:
+        parser_data = ffi.from_handle(parser.app_data)
+        msg_head = parser_data.msg_head
+        sd_field = ffi.string(data, size)
+        msg_head.set_sd_field(sd_field)
+        return 0
+    except Exception:
+        return 1
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_value(parser, data, size):
-    print('on_sd_value')
-    part = ffi.string(data, size)
-    print part
-    print size
-    return 0
+    try:
+        parser_data = ffi.from_handle(parser.app_data)
+        msg_head = parser_data.msg_head
+        sd_value = ffi.string(data, size)
+        msg_head.set_sd_value(sd_value)
+        print msg_head.sd
+        return 0
+    except Exception:
+        return 1
+
+@ffi.callback("int (syslog_parser *parser)")
+def on_msg_head(parser):
+    try:
+        parser_data = ffi.from_handle(parser.app_data)
+        msg_head = parser_data.msg_head
+
+        msg_head.priority = str(parser.msg_head.priority)
+        msg_head.version = str(parser.msg_head.version)
+        msg_head.timestamp = ffi.string(
+            parser.msg_head.timestamp,
+            parser.msg_head.timestamp_len)
+        msg_head.hostname = ffi.string(
+            parser.msg_head.hostname,
+            parser.msg_head.hostname_len)
+        msg_head.appname = ffi.string(
+            parser.msg_head.appname,
+            parser.msg_head.appname_len)
+        msg_head.processid = ffi.string(
+            parser.msg_head.processid,
+            parser.msg_head.processid_len)
+        msg_head.messageid = ffi.string(
+            parser.msg_head.messageid,
+            parser.msg_head.messageid_len)
+
+        parser_data.msg_handler.on_msg_head(msg_head)
+        parser_data.msg_head = SyslogMessageHead()
+        return 0
+    except Exception:
+        return 1
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
-def on_msg(parser, data, size):
-    print('on_msg')
-    part = ffi.string(data, size)
-    print part
-    print size
-    parser_data = ffi.from_handle(parser.app_data)
-    parser_data.msg_handler.message_part(part)
-    return 0
+def on_msg_part(parser, data, size):
+    try:
+        part = ffi.string(data, size)
+        parser_data = ffi.from_handle(parser.app_data)
+        parser_data.msg_handler.on_msg_part(part)
+        return 0
+    except Exception:
+        return 1
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
-    print('on_msg_complete')
-    parser_data = ffi.from_handle(parser.app_data)
-    parser_data.msg_handler.message_complete()
-    return 0
+    try:
+        parser_data = ffi.from_handle(parser.app_data)
+        parser_data.msg_handler.on_msg_complete()
+        return 0
+    except Exception:
+        return 1
 
 
 class Parser(object):
@@ -278,7 +297,7 @@ class Parser(object):
         self._cparser_settings.on_sd_element = on_sd_element
         self._cparser_settings.on_sd_field = on_sd_field
         self._cparser_settings.on_sd_value = on_sd_value
-        self._cparser_settings.on_msg = on_msg
+        self._cparser_settings.on_msg_part = on_msg_part
         self._cparser_settings.on_msg_complete = on_msg_complete
 
     def read(self, bytearray):
@@ -289,12 +308,15 @@ class Parser(object):
             len(bytearray))
 
     def reset(self):
-        self.cparser.reset()
+        lib.uslg_parser_reset(self._cparser)
+        self._data.msg_handler.msg_head = None
+        self._data.msg_head = SyslogMessageHead()
 
 
 class ParserData(object):
     def __init__(self, msg_handler):
         self.msg_handler = msg_handler
+        self.msg_head = SyslogMessageHead()
 
 
 

@@ -80,7 +80,7 @@ struct syslog_parser_settings {
     syslog_data_cb    on_sd_element;
     syslog_data_cb    on_sd_field;
     syslog_data_cb    on_sd_value;
-    syslog_data_cb    on_msg;
+    syslog_data_cb    on_msg_part;
     syslog_cb         on_msg_complete;
 };
 

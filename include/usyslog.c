@@ -297,7 +297,7 @@ int read_message(syslog_parser *parser, const syslog_parser_settings *settings, 
     }
 
     if (read > 0) {
-        parser->error = settings->on_msg(parser, data, read);
+        parser->error = settings->on_msg_part(parser, data, read);
     }
 
     if (!parser->error && msg_complete) {
