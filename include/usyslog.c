@@ -51,9 +51,9 @@ typedef enum {
     // RFC5424 - SDATA
     s_sd_start,
     s_sd_element,
+    s_sd_field_start,
     s_sd_field,
-    s_sd_field_end,
-    s_sd_value_begin,
+    s_sd_value_start,
     s_sd_value,
     s_sd_value_end,
     s_sd_end,
@@ -225,12 +225,12 @@ char * get_state_name(syslog_state state) {
             return "sd_start";
         case s_sd_element:
             return "sd_element";
+        case s_sd_field_start:
+            return "sd_field_start";
         case s_sd_field:
             return "sd_field";
-        case s_sd_field_end:
-            return "sd_field_end";
-        case s_sd_value_begin:
-            return "sd_value_begin";
+        case s_sd_value_start:
+            return "sd_value_start";
         case s_sd_value:
             return "sd_value";
         case s_sd_end:
@@ -333,7 +333,7 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
                 parser->flags |= F_ESCAPED;
             } else {
                 parser->error = on_data_cb(parser, settings->on_sd_value);
-                set_state(parser, s_sd_field);
+                set_state(parser, s_sd_field_start);
             }
             break;
 
@@ -344,62 +344,52 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
     return rv_advance;
 }
 
-int sd_value_begin(syslog_parser *parser, char nb) {
-    int retval = rv_advance;
-
+int sd_value_start(syslog_parser *parser, char nb) {
     if (nb == '"') {
         set_state(parser, s_sd_value);
     }
 
-    return retval;
-}
-
-int sd_field_end(syslog_parser *parser, char nb) {
-    int retval = rv_advance;
-
-    if (nb == '=') {
-        set_state(parser, s_sd_value_begin);
-    }
-
-    return retval;
+    return rv_advance;
 }
 
 int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    int retval = rv_advance;
+    if (nb == '=') {
+        parser->error = on_data_cb(parser, settings->on_sd_field);
+        set_state(parser, s_sd_value_start);
+    } else {
+        store_byte(nb, parser);
+    }
 
+    return rv_advance;
+}
+
+int sd_field_start(syslog_parser *parser, char nb) {
     if (IS_ALPHANUM(nb)) {
         store_byte(nb, parser);
+        set_state(parser, s_sd_field);
     } else {
-        retval = on_data_cb(parser, settings->on_sd_field);
-
         switch (nb) {
             case ']':
-                set_state(parser, s_sd_end);
-                break;
-
-            case '=':
-                set_state(parser, s_sd_value_begin);
+                set_state(parser, s_sd_start);
                 break;
 
             default:
-                set_state(parser, s_sd_field_end);
+                parser->error = SLERR_BAD_SD_FIELD;
         }
     }
 
-    return retval;
+    return rv_advance;
 }
 
 int sd_element(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    int retval = rv_advance;
-
     if (!IS_WS(nb)) {
         store_byte(nb, parser);
     } else {
-        retval = on_data_cb(parser, settings->on_sd_element);
-        set_state(parser, s_sd_field);
+        parser->error = on_data_cb(parser, settings->on_sd_element);
+        set_state(parser, s_sd_field_start);
     }
 
-    return retval;
+    return rv_advance;
 }
 
 int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
@@ -606,16 +596,16 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
                 action = sd_element(parser, settings, next_byte);
                 break;
 
+            case s_sd_field_start:
+                action = sd_field_start(parser, next_byte);
+                break;
+
             case s_sd_field:
                 action = sd_field(parser, settings, next_byte);
                 break;
 
-            case s_sd_field_end:
-                action = sd_field_end(parser, next_byte);
-                break;
-
-            case s_sd_value_begin:
-                action = sd_value_begin(parser, next_byte);
+            case s_sd_value_start:
+                action = sd_value_start(parser, next_byte);
                 break;
 
             case s_sd_value:
