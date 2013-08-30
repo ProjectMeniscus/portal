@@ -193,12 +193,11 @@ def on_msg_begin(parser):
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_head(parser):
-    print('on_msg_head')
-    msg_head = ffi.from_handle(parser.app_data)
-    print(msg_head)
+    parser_data = ffi.from_handle(parser.app_data)
+    msg_head = SyslogMessageHead()
 
-    msg_head.priority = parser.msg_head.priority
-    msg_head.version = parser.msg_head.version
+    msg_head.priority = str(parser.msg_head.priority)
+    msg_head.version = str(parser.msg_head.version)
     msg_head.timestamp = ffi.string(
         parser.msg_head.timestamp,
         parser.msg_head.timestamp_len)
@@ -215,52 +214,60 @@ def on_msg_head(parser):
         parser.msg_head.messageid,
         parser.msg_head.messageid_len)
 
-    print(msg_head.priority)
-    print(msg_head.version)
-    print(msg_head.timestamp)
-    print(msg_head.hostname)
-    print(msg_head.appname)
-    print(msg_head.processid)
-    print(msg_head.messageid)
+    parser_data.msg_handler.message_head(msg_head)
 
     return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
 def on_sd_element(parser, at, size):
     print('on_sd_element')
+    part = ffi.string(at, size)
+    print part
+    print size
     return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
 def on_sd_field(parser, at, size):
     print('on_sd_field')
+    part = ffi.string(at, size)
+    print part
+    print size
     return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
 def on_sd_value(parser, at, size):
     print('on_sd_value')
+    part = ffi.string(at, size)
+    print part
+    print size
     return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
 def on_msg(parser, at, size):
     print('on_msg')
+    part = ffi.string(at, size)
+    print part
+    print size
     return 0
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
     print('on_msg_complete')
-    return 0
+    parser_data = ffi.from_handle(parser.app_data)
 
+    #parser_data.msg_handler.message_complete()
+    return 0
 
 
 class Parser(object):
 
-    def __init__(self, msg_delegate):
-        self._msg_head = SyslogMessageHead()
-        self._msg_head_ctype = ffi.new_handle(self._msg_head)
+    def __init__(self, msg_handler):
+        self._data = ParserData(msg_handler)
+        self._data_ctype = ffi.new_handle(self._data)
 
         # Init the parser
         self._cparser = ffi.new("syslog_parser *")
-        lib.uslg_parser_init(self._cparser, self._msg_head_ctype)
+        lib.uslg_parser_init(self._cparser, self._data_ctype)
 
         # Init our callbacks
         self._cparser_settings = ffi.new("syslog_parser_settings *")
@@ -272,7 +279,6 @@ class Parser(object):
         self._cparser_settings.on_msg = on_msg
         self._cparser_settings.on_msg_complete = on_msg_complete
 
-
     def read(self, bytearray):
         lib.uslg_parser_exec(
             self._cparser,
@@ -282,4 +288,11 @@ class Parser(object):
 
     def reset(self):
         self.cparser.reset()
+
+
+class ParserData(object):
+    def __init__(self, msg_handler):
+        self.msg_handler = msg_handler
+
+
 

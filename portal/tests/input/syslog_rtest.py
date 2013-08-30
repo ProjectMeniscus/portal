@@ -11,6 +11,12 @@ ACTUAL_MESSAGE = (
     b'[origin software="rsyslogd" swVersion="7.2.5" x-pid="12662" x-info='
     b'"http://www.rsyslog.com"] start')
 
+ACTUAL_MESSAGE = (
+    b'225 <142>1 2013-07-12T14:17:00.134003+00:00 tohru apache - - '
+    b'[meniscus token="4c5e9071-6791-4023-859c-aa39077582d0" '
+    b'tenant="95feffb0"] 127.0.0.1 - - [12/Jul/2013:19:40:58 +0000]'
+    b' "GET /test.html HTTP/1.1" 404 466 "-" "curl/7.29.0"')
+
 
 def chunk_message(data, parser, chunk_size=10, limit=-1):
     if limit <= 0:
@@ -67,71 +73,13 @@ class MessageValidator(SyslogMessageHandler):
 class ActualValidator(MessageValidator):
 
     def _validate(self, test, caught_exception, msg_head, msg):
-        test.assertEqual('46', msg_head.priority)
+        test.assertEqual('142', msg_head.priority)
         test.assertEqual('1', msg_head.version)
-        test.assertEqual('2013-04-02T14:12:04.873490-05:00',
+        test.assertEqual('2013-07-12T14:17:00.134003+00:00',
                          msg_head.timestamp)
         test.assertEqual('tohru', msg_head.hostname)
-        test.assertEqual('rsyslogd', msg_head.appname)
+        test.assertEqual('apache', msg_head.appname)
         test.assertEqual('-', msg_head.processid)
-        test.assertEqual('-', msg_head.messageid)
-        test.assertEqual(0, len(msg_head.sd))
-
-
-class HappyPathValidator(MessageValidator):
-
-    def _validate(self, test, caught_exception, msg_head, msg):
-        test.assertEqual('46', msg_head.priority)
-        test.assertEqual('1', msg_head.version)
-        test.assertEqual('2012-12-11T15:48:23.217459-06:00',
-                         msg_head.timestamp)
-        test.assertEqual('tohru', msg_head.hostname)
-        test.assertEqual('rsyslogd', msg_head.appname)
-        test.assertEqual('6611', msg_head.processid)
-        test.assertEqual('12512', msg_head.messageid)
-        test.assertEqual(2, len(msg_head.sd))
-
-        # Unicode and python 2.x makes John cry
-        expected_sd = {
-            unicode('origin_1'): {
-                unicode('software'): b'rsyslogd',
-                unicode('swVersion'): b'7.2.2',
-                unicode('x-pid'): b'12297',
-                unicode('x-info'): b'http://www.rsyslog.com'
-            },
-            unicode('origin_2'): {
-                unicode('software'): b'rsyslogd',
-                unicode('swVersion'): b'7.2.2',
-                unicode('x-pid'): b'12297',
-                unicode('x-info'): b'http://www.rsyslog.com'
-            }
-        }
-
-        test.assertEqual(expected_sd, msg_head.sd)
-
-
-class MissingFieldsValidator(MessageValidator):
-
-    def _validate(self, test, caught_exception, msg_head, msg):
-        test.assertEqual('46', msg_head.priority)
-        test.assertEqual('1', msg_head.version)
-        test.assertEqual('-', msg_head.timestamp)
-        test.assertEqual('tohru', msg_head.hostname)
-        test.assertEqual('-', msg_head.appname)
-        test.assertEqual('6611', msg_head.processid)
-        test.assertEqual('-', msg_head.messageid)
-        test.assertEqual(2, len(msg_head.sd))
-
-
-class MissingSDValidator(MessageValidator):
-
-    def _validate(self, test, caught_exception, msg_head, msg):
-        test.assertEqual('46', msg_head.priority)
-        test.assertEqual('1', msg_head.version)
-        test.assertEqual('-', msg_head.timestamp)
-        test.assertEqual('tohru', msg_head.hostname)
-        test.assertEqual('-', msg_head.appname)
-        test.assertEqual('6611', msg_head.processid)
         test.assertEqual('-', msg_head.messageid)
         test.assertEqual(0, len(msg_head.sd))
 

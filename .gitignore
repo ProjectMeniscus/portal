@@ -5,6 +5,7 @@ dist/
 *.pyc
 *.so
 .idea
+*.iml
 *.egg-info/
 portal/input/*.c
 *~

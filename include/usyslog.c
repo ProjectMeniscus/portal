@@ -185,7 +185,9 @@ int on_cb(syslog_parser *parser, syslog_cb cb) {
 }
 
 int on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
-    return cb(parser, parser->buffer->bytes, parser->buffer->position);
+    int retval =  cb(parser, parser->buffer->bytes, parser->buffer->position);
+    reset_buffer(parser);
+    return retval;
 }
 
 void set_token_state(syslog_parser *parser, token_state next_state) {
@@ -372,7 +374,7 @@ int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char
 
         switch (nb) {
             case ']':
-                set_state(parser, s_sd_start);
+                set_state(parser, s_sd_end);
                 break;
 
             case '=':
