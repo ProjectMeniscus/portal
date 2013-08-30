@@ -15,7 +15,7 @@ typedef struct syslog_msg_head syslog_msg_head;
 typedef struct syslog_parser_settings syslog_parser_settings;
 
 typedef int (*syslog_cb) (syslog_parser *parser);
-typedef int (*syslog_data_cb) (syslog_parser *parser, const char *at, size_t len);
+typedef int (*syslog_data_cb) (syslog_parser *parser, const char *data, size_t len);
 
 // Enumerations
 enum flags {

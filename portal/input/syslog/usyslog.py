@@ -10,7 +10,7 @@ typedef struct syslog_msg_head syslog_msg_head;
 typedef struct syslog_parser_settings syslog_parser_settings;
 
 typedef int (*syslog_cb) (syslog_parser *parser);
-typedef int (*syslog_data_cb) (syslog_parser *parser, const char *at, size_t len);
+typedef int (*syslog_data_cb) (syslog_parser *parser, const char *data, size_t len);
 
 // Structs
 struct pbuffer {
@@ -218,34 +218,34 @@ def on_msg_head(parser):
 
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
-def on_sd_element(parser, at, size):
+@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+def on_sd_element(parser, data, size):
     print('on_sd_element')
-    part = ffi.string(at, size)
+    part = ffi.string(data, size)
     print part
     print size
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
-def on_sd_field(parser, at, size):
+@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+def on_sd_field(parser, data, size):
     print('on_sd_field')
-    part = ffi.string(at, size)
+    part = ffi.string(data, size)
     print part
     print size
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
-def on_sd_value(parser, at, size):
+@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+def on_sd_value(parser, data, size):
     print('on_sd_value')
-    part = ffi.string(at, size)
+    part = ffi.string(data, size)
     print part
     print size
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *at, size_t len)")
-def on_msg(parser, at, size):
+@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+def on_msg(parser, data, size):
     print('on_msg')
-    part = ffi.string(at, size)
+    part = ffi.string(data, size)
     print part
     print size
     return 0

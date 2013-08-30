@@ -345,8 +345,13 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
 }
 
 int sd_value_start(syslog_parser *parser, char nb) {
-    if (nb == '"') {
-        set_state(parser, s_sd_value);
+    switch (nb) {
+        case '"':
+            set_state(parser, s_sd_value);
+            break;
+
+        default:
+            parser->error = SLERR_BAD_SD_VALUE;
     }
 
     return rv_advance;
