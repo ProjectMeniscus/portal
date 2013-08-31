@@ -4,7 +4,7 @@ from multiprocessing import Process
 
 from portal.env import get_logger
 from portal.server import start_io, SyslogServer, JsonStreamServer
-from portal.input.usyslog import SyslogMessageHandler
+from portal.input.syslog import SyslogMessageHandler
 from portal.input.jsonstream import JsonMessageHandler
 
 

@@ -200,15 +200,7 @@ void on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
     reset_buffer(parser);
 }
 
-void set_token_state(syslog_parser *parser, token_state next_state) {
-// Print the state switch if we're compiled in DEBUG mode
 #if DEBUG_OUTPUT
-    printf("Setting token state to: %i\n", get_state_name(next_state));
-#endif
-
-    parser->token_state = next_state;
-}
-
 char * get_state_name(syslog_state state) {
     switch (state) {
         case s_msg_start:
@@ -251,6 +243,16 @@ char * get_state_name(syslog_state state) {
         default:
             return "NOT A STATE";
     }
+}
+#endif
+
+void set_token_state(syslog_parser *parser, token_state next_state) {
+// Print the state switch if we're compiled in DEBUG mode
+#if DEBUG_OUTPUT
+    printf("Setting token state to: %i\n", next_state);
+#endif
+
+    parser->token_state = next_state;
 }
 
 void set_state(syslog_parser *parser, syslog_state next_state) {

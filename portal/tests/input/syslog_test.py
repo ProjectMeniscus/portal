@@ -30,7 +30,7 @@ HAPPY_PATH_MESSAGE = bytearray(
     b'start')
 
 MISSING_FIELDS = bytearray(
-    b'216 <46>1 - tohru ' +
+    b'217 <46>1 - tohru ' +
     b'- 6611 - [origin_1 software="rsyslogd" ' +
     b'swVersion="7.2.2" x-pid="12297" ' +
     b'x-info="http://www.rsyslog.com"]' +
@@ -42,13 +42,14 @@ NO_STRUCTURED_DATA = bytearray(
     b'30 <46>1 - tohru - 6611 - - start')
 
 
-def chunk_message(data, parser, chunk_size=10, limit=-1):
-    if limit <= 0:
-        limit = len(data)
+def chunk_message(data, parser, chunk_size=10):
+    limit = len(data)
     index = 0
+
     while index < limit:
         next_index = index + chunk_size
         end_index = next_index if next_index < limit else limit
+        print('{} to {} -> {}'.format(index, end_index, data[index:end_index]))
         parser.read(data[index:end_index])
         index = end_index
 
@@ -60,6 +61,7 @@ class MessageValidator(SyslogMessageHandler):
         self.times_called = 0
         self.msg = ''
         self.msg_head = None
+        self.complete = False
         self.caught_exception = None
 
     @property
@@ -69,21 +71,21 @@ class MessageValidator(SyslogMessageHandler):
     def call_received(self):
         self.times_called += 1
 
-    def exception(self, ex):
-        self.caught_exception = ex
-        self.call_received()
-
-    def message_head(self, msg_head):
+    def on_msg_head(self, msg_head):
         self.msg_head = msg_head
         self.call_received()
 
-    def message_part(self, msg_part):
+    def on_msg_part(self, msg_part):
         self.msg += msg_part
 
-    def message_complete(self, msg_part):
-        self.msg += msg_part
+    def on_msg_complete(self):
+        self.complete = True
 
     def validate(self):
+        self.test.assertTrue(
+            self.complete,
+            'A syslog message must be completed in order to be valid.')
+
         self._validate(
             self.test,
             self.caught_exception,
@@ -172,35 +174,28 @@ class WhenParsingSyslog(unittest.TestCase):
         validator = MessageValidator(self)
         parser = Parser(validator)
 
-        parser.read(BAD_OCTET_COUNT)
-        self.assertTrue(validator.called)
-        self.assertIsNotNone(validator.caught_exception)
-        self.assertEqual(ParsingError, type(validator.caught_exception))
+        with self.assertRaises(ParsingError):
+            parser.read(BAD_OCTET_COUNT)
 
     def test_too_long_octet_count(self):
         validator = MessageValidator(self)
         parser = Parser(validator)
 
-        parser.read(TOO_LONG_OCTET_COUNT)
-        self.assertTrue(validator.called)
-        self.assertIsNotNone(validator.caught_exception)
-        self.assertEqual(ParsingError, type(validator.caught_exception))
+        with self.assertRaises(ParsingError):
+            parser.read(TOO_LONG_OCTET_COUNT)
 
     def test_short_octet_count(self):
         validator = MessageValidator(self)
         parser = Parser(validator)
 
-        parser.read(SHORT_OCTET_COUNT)
-        self.assertTrue(validator.called)
-        self.assertIsNotNone(validator.caught_exception)
-        self.assertEqual(ParsingError, type(validator.caught_exception))
+        with self.assertRaises(ParsingError):
+            parser.read(SHORT_OCTET_COUNT)
 
     def test_read_actual_message(self):
         validator = ActualValidator(self)
         parser = Parser(validator)
 
         parser.read(ACTUAL_MESSAGE)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
         validator.validate()
 
@@ -209,7 +204,6 @@ class WhenParsingSyslog(unittest.TestCase):
         parser = Parser(validator)
 
         chunk_message(HAPPY_PATH_MESSAGE, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
         validator.validate()
 
@@ -218,7 +212,6 @@ class WhenParsingSyslog(unittest.TestCase):
         parser = Parser(validator)
 
         chunk_message(MISSING_FIELDS, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
         validator.validate()
 
@@ -227,7 +220,6 @@ class WhenParsingSyslog(unittest.TestCase):
         parser = Parser(validator)
 
         chunk_message(NO_STRUCTURED_DATA, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertTrue(validator.called)
         validator.validate()
 
@@ -236,13 +228,9 @@ class WhenParsingSyslog(unittest.TestCase):
         parser = Parser(validator)
 
         chunk_message(ACTUAL_MESSAGE, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         chunk_message(ACTUAL_MESSAGE, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         chunk_message(ACTUAL_MESSAGE, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         chunk_message(ACTUAL_MESSAGE, parser)
-        self.assertEqual(0, parser.cparser._lexer().remaining())
         self.assertEqual(4, validator.times_called)
 
 

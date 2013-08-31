@@ -4,7 +4,7 @@ from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
 from tornado.tcpserver import TCPServer
 
-from portal.input.usyslog import Parser, SyslogMessageHandler
+from portal.input.syslog import Parser, SyslogMessageHandler
 from portal.input.jsonep import JsonEventParser
 from portal.input.jsonstream import JsonMessageAssembler
 

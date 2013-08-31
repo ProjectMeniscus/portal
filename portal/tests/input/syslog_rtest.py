@@ -36,6 +36,7 @@ class MessageValidator(SyslogMessageHandler):
         self.times_called = 0
         self.msg = ''
         self.msg_head = None
+        self.complete = False
         self.caught_exception = None
 
     def clear(self):
@@ -64,9 +65,13 @@ class MessageValidator(SyslogMessageHandler):
         self.msg += msg_part
 
     def on_msg_complete(self):
-        pass
+        self.complete = True
 
     def validate(self):
+        self.test.assertTrue(
+            self.complete,
+            'A syslog message must be completed in order to be valid.')
+
         self._validate(
             self.test,
             self.caught_exception,

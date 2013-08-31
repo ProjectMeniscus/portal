@@ -90,9 +90,9 @@ USYSLOG_LIB = FFI.verify(
     #include "usyslog.h"
     """,
     include_dirs=['./include'],
-    sources=['./include/usyslog.c'])
+    sources=['./include/usyslog.c'],
 #   Uncomment the line below for debug output
-#    extra_compile_args=['-D DEBUG_OUTPUT'])
+    extra_compile_args=['-D DEBUG_OUTPUT'])
 
 FFI.cdef("""
 // C stdlib Functions
@@ -117,6 +117,17 @@ class ParsingError(SyslogError):
         super(ParsingError, self).__init__(msg)
         self.cause = cause
 
+    def __str__(self):
+        try:
+            formatted = 'Error: {}'.format(self.msg)
+            if self.cause:
+                cause_msg = '  Caused by: {}'.format(
+                        getattr(self.cause, 'msg', str(self.cause)))
+                return '\n'.join((formatted, cause_msg))
+            return formatted
+        except Exception as ex:
+            return str(ex)
+
 
 class SyslogMessageHandler(object):
 
@@ -130,7 +141,7 @@ class SyslogMessageHandler(object):
     def on_msg_part(self, message_part):
         pass
 
-    def on_msg_complete(self, message_part):
+    def on_msg_complete(self):
         pass
 
 
@@ -302,12 +313,19 @@ class Parser(object):
         self._cparser_settings.on_msg_part = on_msg_part
         self._cparser_settings.on_msg_complete = on_msg_complete
 
-    def read(self, bytearray):
+    def read(self, data):
+        if isinstance(data, str):
+            strval = data
+        elif isinstance(data, bytearray):
+            strval = str(data)
+        elif isinstance(data, unicode):
+            strval = data.encode('utf-8')
+
         result = USYSLOG_LIB.uslg_parser_exec(
             self._cparser,
             self._cparser_settings,
-            bytearray,
-            len(bytearray))
+            strval,
+            len(strval))
 
         if result:
             error_cstr = USYSLOG_LIB.uslg_error_string(result)
