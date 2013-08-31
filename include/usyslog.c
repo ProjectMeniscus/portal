@@ -162,7 +162,10 @@ int copy_into_pbuffer(const char *source, pbuffer *dest, size_t length) {
 
 char * copy_pbuffer(pbuffer *src) {
     char *new = (char *) malloc(src->position * sizeof(char));
-    memcpy(new, src->bytes, src->position);
+
+    if (!errno) {
+        memcpy(new, src->bytes, src->position);
+    }
 
     return new;
 }
@@ -179,20 +182,28 @@ int store_byte(char byte, syslog_parser *parser) {
     return store_byte_in_pbuffer(byte, parser->buffer);
 }
 
-int on_cb(syslog_parser *parser, syslog_cb cb) {
-    return cb(parser);
+void on_cb(syslog_parser *parser, syslog_cb cb) {
+    const int error = cb(parser);
+
+    if (error) {
+        parser->error = SLERR_USER_ERROR;
+    }
 }
 
-int on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
-    int retval =  cb(parser, parser->buffer->bytes, parser->buffer->position);
+void on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
+    const int error = cb(parser, parser->buffer->bytes, parser->buffer->position);
+
+    if (error) {
+        parser->error = SLERR_USER_ERROR;
+    }
+
     reset_buffer(parser);
-    return retval;
 }
 
 void set_token_state(syslog_parser *parser, token_state next_state) {
 // Print the state switch if we're compiled in DEBUG mode
 #if DEBUG_OUTPUT
-    printf("Setting token state to: %i\n", next_state);
+    printf("Setting token state to: %i\n", get_state_name(next_state));
 #endif
 
     parser->token_state = next_state;
@@ -254,39 +265,44 @@ void set_state(syslog_parser *parser, syslog_state next_state) {
 
 void set_str_field(syslog_parser *parser) {
     char *value = copy_parser_buffer(parser);
-    int len = parser->buffer->position;
 
-    switch (parser->state) {
-        case s_timestamp:
-            parser->msg_head->timestamp = value;
-            parser->msg_head->timestamp_len = len;
-            break;
+    if (value == NULL) {
+        parser->error = SLERR_UNABLE_TO_ALLOCATE;
+    } else {
+        int len = parser->buffer->position;
 
-        case s_hostname:
-            parser->msg_head->hostname = value;
-            parser->msg_head->hostname_len = len;
-            break;
+        switch (parser->state) {
+            case s_timestamp:
+                parser->msg_head->timestamp = value;
+                parser->msg_head->timestamp_len = len;
+                break;
 
-        case s_appname:
-            parser->msg_head->appname = value;
-            parser->msg_head->appname_len = len;
-            break;
+            case s_hostname:
+                parser->msg_head->hostname = value;
+                parser->msg_head->hostname_len = len;
+                break;
 
-        case s_processid:
-            parser->msg_head->processid = value;
-            parser->msg_head->processid_len = len;
-            break;
+            case s_appname:
+                parser->msg_head->appname = value;
+                parser->msg_head->appname_len = len;
+                break;
 
-        case s_messageid:
-            parser->msg_head->messageid = value;
-            parser->msg_head->messageid_len = len;
-            break;
+            case s_processid:
+                parser->msg_head->processid = value;
+                parser->msg_head->processid_len = len;
+                break;
 
-        default:
-            free(value);
+            case s_messageid:
+                parser->msg_head->messageid = value;
+                parser->msg_head->messageid_len = len;
+                break;
+
+            default:
+                free(value);
+        }
+
+        reset_buffer(parser);
     }
-
-    reset_buffer(parser);
 }
 
 /**
@@ -315,19 +331,20 @@ int read_message(syslog_parser *parser, const syslog_parser_settings *settings, 
 
     if (read > 0) {
         // If we read something we need to pass it along
-        parser->error = settings->on_msg_part(parser, data, read);
+        const int error = settings->on_msg_part(parser, data, read);
+
+        if (error) {
+            parser->error = SLERR_USER_ERROR;
+        }
     }
 
     if (!parser->error && msg_complete) {
         // If there was no error reported and the message is complete, pass it along
-        const int error = on_cb(parser, settings->on_msg_complete);
+        on_cb(parser, settings->on_msg_complete);
 
-        if (!error) {
+        if (!parser->error) {
             // If there was no error, set the parser back to a blank slate
             uslg_parser_reset(parser);
-        } else {
-            // If there was an error set it - when errors are handled the parser is reset
-            parser->error = error;
         }
     }
 
@@ -344,7 +361,7 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
             if (parser->flags & F_ESCAPED) {
                 parser->flags |= F_ESCAPED;
             } else {
-                parser->error = on_data_cb(parser, settings->on_sd_value);
+                on_data_cb(parser, settings->on_sd_value);
                 set_state(parser, s_sd_field_start);
             }
             break;
@@ -372,7 +389,7 @@ int sd_value_start(syslog_parser *parser, char nb) {
 int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
     switch (nb) {
         case '=':
-            parser->error = on_data_cb(parser, settings->on_sd_field);
+            on_data_cb(parser, settings->on_sd_field);
             set_state(parser, s_sd_value_start);
             break;
 
@@ -405,7 +422,7 @@ int sd_element(syslog_parser *parser, const syslog_parser_settings *settings, ch
     if (!IS_WS(nb)) {
         store_byte(nb, parser);
     } else {
-        parser->error = on_data_cb(parser, settings->on_sd_element);
+        on_data_cb(parser, settings->on_sd_element);
         set_state(parser, s_sd_field_start);
     }
 
@@ -415,7 +432,7 @@ int sd_element(syslog_parser *parser, const syslog_parser_settings *settings, ch
 int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
     int retval = pa_advance;
 
-    parser->error = on_cb(parser, settings->on_msg_head);
+    on_cb(parser, settings->on_msg_head);
 
     switch (nb) {
         case '[':
@@ -530,7 +547,7 @@ int octet_count(syslog_parser *parser, char nb) {
 }
 
 int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    parser->error = on_cb(parser, settings->on_msg_begin);
+    on_cb(parser, settings->on_msg_begin);
 
     if (IS_NUM(nb)) {
         set_state(parser, s_octet_count);
@@ -543,13 +560,13 @@ int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, cha
 
 // Big state switch
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
-    int action, d_index;
+    int d_index;
     int error = 0;
     char next_byte;
 
     for (d_index = 0; d_index < length; d_index++) {
+        int action = pa_none;
         next_byte = data[d_index];
-        action = pa_none;
 
 #if DEBUG_OUTPUT
         printf("Next byte: %c\n", next_byte);
@@ -700,7 +717,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
 
     if (errno) {
         // Allocating the msg_head struct failed!
-        return -1;
+        return SLERR_UNABLE_TO_ALLOCATE;
     }
 
     memset(parser->msg_head, 0, sizeof(syslog_msg_head));
@@ -714,7 +731,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
         // msg_head struct
         free_msg_head_fields(parser->msg_head);
         parser->msg_head = NULL;
-        return -1;
+        return SLERR_UNABLE_TO_ALLOCATE;
     }
 
     uslg_parser_reset(parser);
@@ -726,4 +743,50 @@ void uslg_free_parser(syslog_parser *parser) {
     free_pbuffer(parser->buffer);
     free(parser->msg_head);
     free(parser);
+}
+
+char * uslg_error_string(int error) {
+    switch (error) {
+        case SLERR_UNCAUGHT:
+            return "Uncaught or unknown error.";
+
+        case SLERR_BAD_OCTET_COUNT:
+            return "Octet count on syslog message was bad or malformed.";
+
+        case SLERR_BAD_PRIORITY_START:
+            return "The priority token was not correctly started.";
+
+        case SLERR_BAD_PRIORITY:
+            return "The priority token was bad or malformed.";
+
+        case SLERR_BAD_VERSION:
+            return "The version token was bad or malformed.";
+
+        case SLERR_BAD_SD_START:
+            return "The SDATA token was not started correctly.";
+
+        case SLERR_BAD_SD_FIELD:
+            return "The SDATA field was bad or malformed.";
+
+        case SLERR_BAD_SD_VALUE:
+            return "The SDATA value was bad or malformed.";
+
+        case SLERR_PREMATURE_MSG_END:
+            return "The syslog message was ended with an unescaped delimeter before the parser could reach the message token.";
+
+        case SLERR_BAD_STATE:
+            return "The parser was in a bad state. This should not happen.";
+
+        case SLERR_USER_ERROR:
+            return "The parser encountered an error while running the associated callback.";
+
+        case SLERR_BUFFER_OVERFLOW:
+            return "The parser buffer is not large enough for the data being passed.";
+
+        case SLERR_UNABLE_TO_ALLOCATE:
+            return "Unable to allocate memory.";
+
+        default:
+            return "Unknown error value.";
+    }
 }

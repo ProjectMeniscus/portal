@@ -32,16 +32,18 @@ enum USYSLOG_ERROR {
     SLERR_UNCAUGHT = 1,
     SLERR_BAD_OCTET_COUNT = 2,
     SLERR_BAD_PRIORITY_START = 3,
-    SLERR_BAD_PRIORITY = 3,
-    SLERR_BAD_VERSION = 4,
-    SLERR_BAD_SD_START = 5,
-    SLERR_BAD_SD_FIELD = 6,
-    SLERR_BAD_SD_VALUE = 7,
-    SLERR_PREMATURE_MSG_END = 8,
+    SLERR_BAD_PRIORITY = 4,
+    SLERR_BAD_VERSION = 5,
+    SLERR_BAD_SD_START = 6,
+    SLERR_BAD_SD_FIELD = 7,
+    SLERR_BAD_SD_VALUE = 8,
+    SLERR_PREMATURE_MSG_END = 9,
 
     SLERR_BAD_STATE = 100,
+    SLERR_USER_ERROR = 101,
 
-    SLERR_BUFFER_OVERFLOW = 1000
+    SLERR_BUFFER_OVERFLOW = 200,
+    SLERR_UNABLE_TO_ALLOCATE = 201
 };
 
 
@@ -90,7 +92,7 @@ struct syslog_parser {
     unsigned char token_state;
     unsigned char state;
 
-    // Error
+    // Errors
     unsigned char error;
 
     // Message head
@@ -114,6 +116,8 @@ void uslg_free_parser(syslog_parser *parser);
 
 int uslg_parser_init(syslog_parser *parser, void *app_data);
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length);
+
+char * uslg_error_string(int error);
 
 #ifdef __cplusplus
 }

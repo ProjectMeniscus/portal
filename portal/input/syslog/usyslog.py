@@ -57,7 +57,7 @@ struct syslog_parser {
     unsigned char token_state;
     unsigned char state;
 
-    // Error
+    // Errors
     unsigned char error;
 
     // Message head
@@ -81,6 +81,8 @@ void uslg_free_parser(syslog_parser *parser);
 
 int uslg_parser_init(syslog_parser *parser, void *app_data);
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length);
+
+char * uslg_error_string(int error);
 """)
 
 lib = ffi.verify(
@@ -102,27 +104,11 @@ class SyslogError(Exception):
         return self.msg
 
 
-class UnknownTypeError(SyslogError):
-
-    def __init__(self, msg):
-        super(UnknownTypeError, self).__init__(msg)
-
-
 class ParsingError(SyslogError):
 
-    def __init__(self, msg):
-        super(ParsingError, self).__init__(msg)
-
-
-class MessageHandlerError(SyslogError):
-
     def __init__(self, msg, cause):
-        super(MessageHandlerError, self).__init__(msg)
+        super(ParsingError, self).__init__(msg)
         self.cause = cause
-
-    def __str__(self):
-        return 'MessageHandler exception: {} - {}'.format(
-            self.msg, self.cause)
 
 
 class SyslogMessageHandler(object):
@@ -199,14 +185,16 @@ def on_msg_begin(parser):
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_element(parser, data, size):
+    parser_data = ffi.from_handle(parser.app_data)
+
     try:
-        parser_data = ffi.from_handle(parser.app_data)
         msg_head = parser_data.msg_head
         sd_element = ffi.string(data, size)
         msg_head.create_sde(sd_element)
-        return 0
-    except Exception:
+    except Exception as ex:
+        parser_data.exception = ex
         return 1
+    return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_field(parser, data, size):
@@ -215,9 +203,10 @@ def on_sd_field(parser, data, size):
         msg_head = parser_data.msg_head
         sd_field = ffi.string(data, size)
         msg_head.set_sd_field(sd_field)
-        return 0
-    except Exception:
+    except Exception as ex:
+        parser_data.exception = ex
         return 1
+    return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_value(parser, data, size):
@@ -226,16 +215,15 @@ def on_sd_value(parser, data, size):
         msg_head = parser_data.msg_head
         sd_value = ffi.string(data, size)
         msg_head.set_sd_value(sd_value)
-        print msg_head.sd
-        return 0
-    except Exception:
+    except Exception as ex:
+        parser_data.exception = ex
         return 1
+    return 0
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_head(parser):
     try:
-        parser_data = ffi.from_handle(parser.app_data)
-        msg_head = parser_data.msg_head
+        msg_head = SyslogMessageHead()
 
         msg_head.priority = str(parser.msg_head.priority)
         msg_head.version = str(parser.msg_head.version)
@@ -255,11 +243,12 @@ def on_msg_head(parser):
             parser.msg_head.messageid,
             parser.msg_head.messageid_len)
 
+        parser_data = ffi.from_handle(parser.app_data)
         parser_data.msg_handler.on_msg_head(msg_head)
-        parser_data.msg_head = SyslogMessageHead()
-        return 0
-    except Exception:
+    except Exception as ex:
+        parser_data.exception = ex
         return 1
+    return 0
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_msg_part(parser, data, size):
@@ -267,18 +256,20 @@ def on_msg_part(parser, data, size):
         part = ffi.string(data, size)
         parser_data = ffi.from_handle(parser.app_data)
         parser_data.msg_handler.on_msg_part(part)
-        return 0
-    except Exception:
+    except Exception as ex:
+        parser_data.exception = ex
         return 1
+    return 0
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
     try:
         parser_data = ffi.from_handle(parser.app_data)
         parser_data.msg_handler.on_msg_complete()
-        return 0
-    except Exception:
+    except Exception as ex:
+        parser_data.exception = ex
         return 1
+    return 0
 
 
 class Parser(object):
@@ -302,11 +293,16 @@ class Parser(object):
         self._cparser_settings.on_msg_complete = on_msg_complete
 
     def read(self, bytearray):
-        lib.uslg_parser_exec(
+        result = lib.uslg_parser_exec(
             self._cparser,
             self._cparser_settings,
             bytearray,
             len(bytearray))
+
+        if result:
+            raise ParsingError(
+                msg=lib.uslg_error_string(result),
+                cause=self._data.exception)
 
     def reset(self):
         lib.uslg_parser_reset(self._cparser)
@@ -315,9 +311,7 @@ class Parser(object):
 
 
 class ParserData(object):
+
     def __init__(self, msg_handler):
         self.msg_handler = msg_handler
-        self.msg_head = SyslogMessageHead()
-
-
-
+        self.exception = None
