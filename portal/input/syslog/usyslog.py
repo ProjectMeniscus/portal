@@ -198,8 +198,9 @@ def on_sd_element(parser, data, size):
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_field(parser, data, size):
+    parser_data = ffi.from_handle(parser.app_data)
+
     try:
-        parser_data = ffi.from_handle(parser.app_data)
         msg_head = parser_data.msg_head
         sd_field = ffi.string(data, size)
         msg_head.set_sd_field(sd_field)
@@ -210,8 +211,9 @@ def on_sd_field(parser, data, size):
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_value(parser, data, size):
+    parser_data = ffi.from_handle(parser.app_data)
+
     try:
-        parser_data = ffi.from_handle(parser.app_data)
         msg_head = parser_data.msg_head
         sd_value = ffi.string(data, size)
         msg_head.set_sd_value(sd_value)
@@ -222,9 +224,10 @@ def on_sd_value(parser, data, size):
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_head(parser):
+    parser_data = ffi.from_handle(parser.app_data)
+
     try:
         msg_head = SyslogMessageHead()
-
         msg_head.priority = str(parser.msg_head.priority)
         msg_head.version = str(parser.msg_head.version)
         msg_head.timestamp = ffi.string(
@@ -243,7 +246,6 @@ def on_msg_head(parser):
             parser.msg_head.messageid,
             parser.msg_head.messageid_len)
 
-        parser_data = ffi.from_handle(parser.app_data)
         parser_data.msg_handler.on_msg_head(msg_head)
     except Exception as ex:
         parser_data.exception = ex
@@ -252,9 +254,10 @@ def on_msg_head(parser):
 
 @ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_msg_part(parser, data, size):
+    parser_data = ffi.from_handle(parser.app_data)
+
     try:
         part = ffi.string(data, size)
-        parser_data = ffi.from_handle(parser.app_data)
         parser_data.msg_handler.on_msg_part(part)
     except Exception as ex:
         parser_data.exception = ex
@@ -263,8 +266,9 @@ def on_msg_part(parser, data, size):
 
 @ffi.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
+    parser_data = ffi.from_handle(parser.app_data)
+
     try:
-        parser_data = ffi.from_handle(parser.app_data)
         parser_data.msg_handler.on_msg_complete()
     except Exception as ex:
         parser_data.exception = ex
