@@ -88,8 +88,9 @@ lib = ffi.verify(
     #include "usyslog.h"
     """,
     include_dirs=['./include'],
-    sources=['./include/usyslog.c'],
-    extra_compile_args=['-D DEBUG_OUTPUT'])
+    sources=['./include/usyslog.c'])
+#   Uncomment the line below for debug output
+#    extra_compile_args=['-D DEBUG_OUTPUT'])
 
 
 class SyslogError(Exception):

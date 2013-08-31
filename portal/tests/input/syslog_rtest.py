@@ -38,6 +38,12 @@ class MessageValidator(SyslogMessageHandler):
         self.msg_head = None
         self.caught_exception = None
 
+    def clear(self):
+        self.times_called = 0
+        self.msg = ''
+        self.msg_head = None
+        self.caught_exception = None
+
     @property
     def called(self):
         return self.times_called > 0
@@ -99,12 +105,18 @@ class WhenParsingSyslog(unittest.TestCase):
     def test_read_actual_message(self):
         validator = ActualValidator(self)
         parser = Parser(validator)
+
         parser.read(ACTUAL_MESSAGE)
         self.assertTrue(validator.called)
         validator.validate()
-        #parser.reset()
+
+        # Clear the validator for the next run
+        validator.clear()
+
         parser.read(SIMPLE_MESSAGE)
-        #print validator.msg_head.as_dict()
+        self.assertTrue(validator.called)
+        validator.validate()
+
 
 
 if __name__ == '__main__':

@@ -100,28 +100,38 @@ void free_pbuffer(pbuffer *buffer) {
     free(buffer);
 }
 
-void free_msg_head(syslog_msg_head *head) {
+void free_msg_head_fields(syslog_msg_head *head) {
     if (head->timestamp != NULL) {
         free(head->timestamp);
+        head->timestamp = NULL;
     }
 
     if (head->hostname != NULL) {
         free(head->hostname);
+        head->hostname = NULL;
     }
 
     if (head->appname != NULL) {
         free(head->hostname);
+        head->appname = NULL;
     }
 
     if (head->processid != NULL) {
         free(head->processid);
+        head->processid = NULL;
     }
 
     if (head->messageid != NULL) {
         free(head->messageid);
+        head->messageid = NULL;
     }
+}
 
-    free(head);
+void reset_msg_head(syslog_msg_head *head) {
+    free_msg_head_fields(head);
+
+    head->priority = 0;
+    head->version = 0;
 }
 
 int store_byte_in_pbuffer(char byte, pbuffer *dest) {
@@ -279,15 +289,22 @@ void set_str_field(syslog_parser *parser) {
     reset_buffer(parser);
 }
 
+/**
+* Reads the message portion of a syslog message. This function returns an int
+* value representing the number of bytes read from the buffer.
+*/
 int read_message(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
     bool msg_complete = false;
     int read;
 
     if (parser->flags & F_COUNT_OCTETS) {
+        // If we're counting octets then the message ends when we run out of octsts
         read = parser->octets_remaining >= length ? length : parser->octets_remaining;
         parser->octets_remaining -= read;
+
         msg_complete = parser->octets_remaining == 0;
     } else {
+        // If we're not counting octets then the \n character is EOF for the message
         for (read = 0; read < length; read++) {
             if (data[read] == '\n') {
                 msg_complete = true;
@@ -297,11 +314,21 @@ int read_message(syslog_parser *parser, const syslog_parser_settings *settings, 
     }
 
     if (read > 0) {
+        // If we read something we need to pass it along
         parser->error = settings->on_msg_part(parser, data, read);
     }
 
     if (!parser->error && msg_complete) {
-        parser->error = on_cb(parser, settings->on_msg_complete);
+        // If there was no error reported and the message is complete, pass it along
+        const int error = on_cb(parser, settings->on_msg_complete);
+
+        if (!error) {
+            // If there was no error, set the parser back to a blank slate
+            uslg_parser_reset(parser);
+        } else {
+            // If there was an error set it - when errors are handled the parser is reset
+            parser->error = error;
+        }
     }
 
     return read;
@@ -517,6 +544,7 @@ int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, cha
 // Big state switch
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
     int action, d_index;
+    int error = 0;
     char next_byte;
 
     for (d_index = 0; d_index < length; d_index++) {
@@ -624,6 +652,8 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
 
         // Upon error, exit the read loop regardless of action
         if (parser->error) {
+            error = parser->error;
+            uslg_parser_reset(parser);
             break;
         }
 
@@ -633,6 +663,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
                 if (parser->flags & F_COUNT_OCTETS) {
                     parser->octets_remaining--;
                 }
+
                 break;
 
             case pa_rehash:
@@ -641,20 +672,24 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
         }
     }
 
-    return parser->error;
+    return error;
 }
 
 
 // Exported Functions
 
 void uslg_parser_reset(syslog_parser *parser) {
+    parser->octets_read = 0;
     parser->octets_remaining = 0;
+    parser->message_length = 0;
     parser->error = 0;
     parser->flags = 0;
-    parser->message_length = 0;
 
-    parser->state = s_msg_start;
-    parser->token_state = ts_before;
+    reset_msg_head(parser->msg_head);
+    reset_pbuffer(parser->buffer);
+
+    set_state(parser, s_msg_start);
+    set_token_state(parser, ts_before);
 }
 
 int uslg_parser_init(syslog_parser *parser, void *app_data) {
@@ -677,7 +712,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
         // Allocating the buffer failed so let go
         // of the memory we just allocated for the
         // msg_head struct
-        free_msg_head(parser->msg_head);
+        free_msg_head_fields(parser->msg_head);
         parser->msg_head = NULL;
         return -1;
     }
@@ -687,7 +722,8 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
 }
 
 void uslg_free_parser(syslog_parser *parser) {
-    free_msg_head(parser->msg_head);
+    free_msg_head_fields(parser->msg_head);
     free_pbuffer(parser->buffer);
+    free(parser->msg_head);
     free(parser);
 }
