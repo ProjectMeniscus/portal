@@ -1,8 +1,8 @@
 import os
 from cffi import FFI
 
-ffi = FFI()
-ffi.cdef("""
+FFI = FFI()
+FFI.cdef("""
 // Type definitions
 typedef struct pbuffer pbuffer;
 typedef struct syslog_parser syslog_parser;
@@ -85,7 +85,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
 char * uslg_error_string(int error);
 """)
 
-lib = ffi.verify(
+USYSLOG_LIB = FFI.verify(
     """
     #include "usyslog.h"
     """,
@@ -93,6 +93,13 @@ lib = ffi.verify(
     sources=['./include/usyslog.c'])
 #   Uncomment the line below for debug output
 #    extra_compile_args=['-D DEBUG_OUTPUT'])
+
+FFI.cdef("""
+// C stdlib Functions
+size_t strlen(const char *);
+""")
+
+C_LIB = FFI.dlopen(None)
 
 
 class SyslogError(Exception):
@@ -178,71 +185,70 @@ class SyslogMessageHead(object):
         return dictionary
 
 
-@ffi.callback("int (syslog_parser *parser)")
+@FFI.callback("int (syslog_parser *parser)")
 def on_msg_begin(parser):
-    print('on_msg_begin')
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+@FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_element(parser, data, size):
-    parser_data = ffi.from_handle(parser.app_data)
+    parser_data = FFI.from_handle(parser.app_data)
 
     try:
         msg_head = parser_data.msg_head
-        sd_element = ffi.string(data, size)
+        sd_element = FFI.string(data, size)
         msg_head.create_sde(sd_element)
     except Exception as ex:
         parser_data.exception = ex
         return 1
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+@FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_field(parser, data, size):
-    parser_data = ffi.from_handle(parser.app_data)
+    parser_data = FFI.from_handle(parser.app_data)
 
     try:
         msg_head = parser_data.msg_head
-        sd_field = ffi.string(data, size)
+        sd_field = FFI.string(data, size)
         msg_head.set_sd_field(sd_field)
     except Exception as ex:
         parser_data.exception = ex
         return 1
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+@FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_value(parser, data, size):
-    parser_data = ffi.from_handle(parser.app_data)
+    parser_data = FFI.from_handle(parser.app_data)
 
     try:
         msg_head = parser_data.msg_head
-        sd_value = ffi.string(data, size)
+        sd_value = FFI.string(data, size)
         msg_head.set_sd_value(sd_value)
     except Exception as ex:
         parser_data.exception = ex
         return 1
     return 0
 
-@ffi.callback("int (syslog_parser *parser)")
+@FFI.callback("int (syslog_parser *parser)")
 def on_msg_head(parser):
-    parser_data = ffi.from_handle(parser.app_data)
+    parser_data = FFI.from_handle(parser.app_data)
 
     try:
         msg_head = SyslogMessageHead()
         msg_head.priority = str(parser.msg_head.priority)
         msg_head.version = str(parser.msg_head.version)
-        msg_head.timestamp = ffi.string(
+        msg_head.timestamp = FFI.string(
             parser.msg_head.timestamp,
             parser.msg_head.timestamp_len)
-        msg_head.hostname = ffi.string(
+        msg_head.hostname = FFI.string(
             parser.msg_head.hostname,
             parser.msg_head.hostname_len)
-        msg_head.appname = ffi.string(
+        msg_head.appname = FFI.string(
             parser.msg_head.appname,
             parser.msg_head.appname_len)
-        msg_head.processid = ffi.string(
+        msg_head.processid = FFI.string(
             parser.msg_head.processid,
             parser.msg_head.processid_len)
-        msg_head.messageid = ffi.string(
+        msg_head.messageid = FFI.string(
             parser.msg_head.messageid,
             parser.msg_head.messageid_len)
 
@@ -252,21 +258,21 @@ def on_msg_head(parser):
         return 1
     return 0
 
-@ffi.callback("int (syslog_parser *parser, const char *data, size_t len)")
+@FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_msg_part(parser, data, size):
-    parser_data = ffi.from_handle(parser.app_data)
+    parser_data = FFI.from_handle(parser.app_data)
 
     try:
-        part = ffi.string(data, size)
+        part = FFI.string(data, size)
         parser_data.msg_handler.on_msg_part(part)
     except Exception as ex:
         parser_data.exception = ex
         return 1
     return 0
 
-@ffi.callback("int (syslog_parser *parser)")
+@FFI.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
-    parser_data = ffi.from_handle(parser.app_data)
+    parser_data = FFI.from_handle(parser.app_data)
 
     try:
         parser_data.msg_handler.on_msg_complete()
@@ -280,14 +286,14 @@ class Parser(object):
 
     def __init__(self, msg_handler):
         self._data = ParserData(msg_handler)
-        self._data_ctype = ffi.new_handle(self._data)
+        self._data_ctype = FFI.new_handle(self._data)
 
         # Init the parser
-        self._cparser = ffi.new("syslog_parser *")
-        lib.uslg_parser_init(self._cparser, self._data_ctype)
+        self._cparser = FFI.new("syslog_parser *")
+        USYSLOG_LIB.uslg_parser_init(self._cparser, self._data_ctype)
 
         # Init our callbacks
-        self._cparser_settings = ffi.new("syslog_parser_settings *")
+        self._cparser_settings = FFI.new("syslog_parser_settings *")
         self._cparser_settings.on_msg_begin = on_msg_begin
         self._cparser_settings.on_msg_head = on_msg_head
         self._cparser_settings.on_sd_element = on_sd_element
@@ -297,19 +303,23 @@ class Parser(object):
         self._cparser_settings.on_msg_complete = on_msg_complete
 
     def read(self, bytearray):
-        result = lib.uslg_parser_exec(
+        result = USYSLOG_LIB.uslg_parser_exec(
             self._cparser,
             self._cparser_settings,
             bytearray,
             len(bytearray))
 
         if result:
+            error_cstr = USYSLOG_LIB.uslg_error_string(result)
+            error_pystr = FFI.string(
+                USYSLOG_LIB.uslg_error_string(result),
+                C_LIB.strlen(error_cstr))
             raise ParsingError(
-                msg=lib.uslg_error_string(result),
+                msg=error_pystr,
                 cause=self._data.exception)
 
     def reset(self):
-        lib.uslg_parser_reset(self._cparser)
+        USYSLOG_LIB.uslg_parser_reset(self._cparser)
         self._data.msg_handler.msg_head = None
         self._data.msg_head = SyslogMessageHead()
 
