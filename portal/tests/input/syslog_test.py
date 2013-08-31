@@ -49,7 +49,6 @@ def chunk_message(data, parser, chunk_size=10):
     while index < limit:
         next_index = index + chunk_size
         end_index = next_index if next_index < limit else limit
-        print('{} to {} -> {}'.format(index, end_index, data[index:end_index]))
         parser.read(data[index:end_index])
         index = end_index
 
@@ -240,7 +239,7 @@ def performance(duration=10, print_output=True):
     runs = 0
     then = time.time()
     while time.time() - then < duration:
-        chunk_message(HAPPY_PATH_MESSAGE, parser, 263)
+        parser.read(HAPPY_PATH_MESSAGE)
         runs += 1
     if print_output:
         print('Ran {} times in {} seconds for {} runs per second.'.format(
@@ -249,13 +248,9 @@ def performance(duration=10, print_output=True):
             runs / float(duration)))
 
 
-if __name__ == '__main__':
+if __name__ == '__main__1':
     unittest.main()
 
-if __name__ == '__main__1':
+if __name__ == '__main__':
     print('Executing performance test')
-    performance(5)
-
-    print('Profiling...')
-    import cProfile
-    cProfile.run('performance(5)')
+    performance()

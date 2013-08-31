@@ -90,9 +90,9 @@ USYSLOG_LIB = FFI.verify(
     #include "usyslog.h"
     """,
     include_dirs=['./include'],
-    sources=['./include/usyslog.c'],
+    sources=['./include/usyslog.c'])
 #   Uncomment the line below for debug output
-    extra_compile_args=['-D DEBUG_OUTPUT'])
+#    extra_compile_args=['-D DEBUG_OUTPUT'])
 
 FFI.cdef("""
 // C stdlib Functions
