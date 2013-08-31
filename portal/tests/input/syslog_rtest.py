@@ -106,17 +106,21 @@ class WhenParsingSyslog(unittest.TestCase):
         validator = ActualValidator(self)
         parser = Parser(validator)
 
-        parser.read(ACTUAL_MESSAGE)
-        self.assertTrue(validator.called)
-        validator.validate()
+        try:
+            parser.read(ACTUAL_MESSAGE)
+            self.assertTrue(validator.called)
+            validator.validate()
 
-        # Clear the validator for the next run
-        validator.clear()
+            # Clear the validator for the next run
+            validator.clear()
 
-        parser.read(SIMPLE_MESSAGE)
-        self.assertTrue(validator.called)
-        validator.validate()
-
+            parser.read(SIMPLE_MESSAGE)
+            self.assertTrue(validator.called)
+            validator.validate()
+        except ParsingError as err:
+            print(err.msg)
+            print(err.cause)
+            self.fail('Exception caught: {}'.format(err))
 
 
 if __name__ == '__main__':

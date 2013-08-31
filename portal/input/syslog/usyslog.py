@@ -233,7 +233,7 @@ def on_msg_head(parser):
     parser_data = FFI.from_handle(parser.app_data)
 
     try:
-        msg_head = SyslogMessageHead()
+        msg_head = parser_data.msg_head
         msg_head.priority = str(parser.msg_head.priority)
         msg_head.version = str(parser.msg_head.version)
         msg_head.timestamp = FFI.string(
@@ -328,4 +328,5 @@ class ParserData(object):
 
     def __init__(self, msg_handler):
         self.msg_handler = msg_handler
+        self.msg_head = SyslogMessageHead()
         self.exception = None
