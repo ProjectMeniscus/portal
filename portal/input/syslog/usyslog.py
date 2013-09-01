@@ -198,6 +198,12 @@ class SyslogMessageHead(object):
 
 @FFI.callback("int (syslog_parser *parser)")
 def on_msg_begin(parser):
+    parser_data = FFI.from_handle(parser.app_data)
+    try:
+        parser_data.msg_head = SyslogMessageHead()
+    except Exception as ex:
+        parser_data.exception = ex
+        return 1
     return 0
 
 @FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
@@ -264,6 +270,7 @@ def on_msg_head(parser):
             parser.msg_head.messageid_len)
 
         parser_data.msg_handler.on_msg_head(msg_head)
+
     except Exception as ex:
         parser_data.exception = ex
         return 1
@@ -346,5 +353,5 @@ class ParserData(object):
 
     def __init__(self, msg_handler):
         self.msg_handler = msg_handler
-        self.msg_head = SyslogMessageHead()
+        self.msg_head = None
         self.exception = None
