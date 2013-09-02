@@ -1,5 +1,5 @@
 
-from  portal.input.jsonep import JsonEventHandler, JsonEventParser
+from portal.input.jsonep import JsonEventHandler
 
 
 class JsonMessageHandler(object):
@@ -66,7 +66,8 @@ class JsonMessageAssembler(JsonEventHandler):
         if self.object_stack:
             self._assign(tree_object)
         else:
-            raise Exception('A JSON stream message may not begin with an array.')
+            raise Exception(
+                'A JSON stream message may not begin with an array.')
         self.object_stack.append(tree_object)
         self.current_object = tree_object
 
@@ -96,4 +97,3 @@ class JsonMessageAssembler(JsonEventHandler):
 
     def null_value(self):
         self._assign(None)
-

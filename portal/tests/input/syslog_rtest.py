@@ -81,13 +81,13 @@ class MessageValidator(SyslogMessageHandler):
 
     def validate_sd_msg(self):
         self.test.assertEqual('142', self.msg_head.priority)
-        self.test.assertEqual('1',self.msg_head.version)
+        self.test.assertEqual('1', self.msg_head.version)
         self.test.assertEqual('2013-07-12T14:17:00.134003+00:00',
-                         self.msg_head.timestamp)
+                              self.msg_head.timestamp)
         self.test.assertEqual('tohru', self.msg_head.hostname)
         self.test.assertEqual('apache', self.msg_head.appname)
         self.test.assertEqual('-', self.msg_head.processid)
-        self.test.assertEqual('-',self.msg_head.messageid)
+        self.test.assertEqual('-', self.msg_head.messageid)
         self.test.assertEqual(1, len(self.msg_head.sd))
         self.test.assertTrue('meniscus' in self.msg_head.sd)
         self.test.assertTrue('token' in self.msg_head.sd['meniscus'])
@@ -102,13 +102,13 @@ class MessageValidator(SyslogMessageHandler):
 
     def validate_simple_msg(self):
         self.test.assertEqual('46', self.msg_head.priority)
-        self.test.assertEqual('1',self.msg_head.version)
+        self.test.assertEqual('1', self.msg_head.version)
         self.test.assertEqual('2013-04-02T14:12:04.873490-05:00',
                               self.msg_head.timestamp)
         self.test.assertEqual('tohru', self.msg_head.hostname)
         self.test.assertEqual('rsyslogd', self.msg_head.appname)
         self.test.assertEqual('-', self.msg_head.processid)
-        self.test.assertEqual('-',self.msg_head.messageid)
+        self.test.assertEqual('-', self.msg_head.messageid)
         self.test.assertEqual(0, len(self.msg_head.sd))
         self.test.assertEqual(('[origin software="rsyslogd" swVersion="7.2.5" '
                                'x-pid="12662" x-info="http://www.rsyslog.com"]'
@@ -140,4 +140,3 @@ class WhenParsingSyslog(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

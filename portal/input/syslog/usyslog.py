@@ -10,7 +10,8 @@ typedef struct syslog_msg_head syslog_msg_head;
 typedef struct syslog_parser_settings syslog_parser_settings;
 
 typedef int (*syslog_cb) (syslog_parser *parser);
-typedef int (*syslog_data_cb) (syslog_parser *parser, const char *data, size_t len);
+typedef int (
+    *syslog_data_cb) (syslog_parser *parser, const char *data, size_t len);
 
 // Structs
 struct pbuffer {
@@ -80,7 +81,9 @@ void uslg_parser_reset(syslog_parser *parser);
 void uslg_free_parser(syslog_parser *parser);
 
 int uslg_parser_init(syslog_parser *parser, void *app_data);
-int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length);
+int uslg_parser_exec(
+    syslog_parser *parser, const syslog_parser_settings *settings,
+    const char *data, size_t length);
 
 char * uslg_error_string(int error);
 """)
@@ -122,7 +125,7 @@ class ParsingError(SyslogError):
             formatted = 'Error: {}'.format(self.msg)
             if self.cause:
                 cause_msg = '  Caused by: {}'.format(
-                        getattr(self.cause, 'msg', str(self.cause)))
+                    getattr(self.cause, 'msg', str(self.cause)))
                 return '\n'.join((formatted, cause_msg))
             return formatted
         except Exception as ex:
@@ -206,6 +209,7 @@ def on_msg_begin(parser):
         return 1
     return 0
 
+
 @FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_element(parser, data, size):
     parser_data = FFI.from_handle(parser.app_data)
@@ -218,6 +222,7 @@ def on_sd_element(parser, data, size):
         parser_data.exception = ex
         return 1
     return 0
+
 
 @FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_field(parser, data, size):
@@ -232,6 +237,7 @@ def on_sd_field(parser, data, size):
         return 1
     return 0
 
+
 @FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_sd_value(parser, data, size):
     parser_data = FFI.from_handle(parser.app_data)
@@ -244,6 +250,7 @@ def on_sd_value(parser, data, size):
         parser_data.exception = ex
         return 1
     return 0
+
 
 @FFI.callback("int (syslog_parser *parser)")
 def on_msg_head(parser):
@@ -276,6 +283,7 @@ def on_msg_head(parser):
         return 1
     return 0
 
+
 @FFI.callback("int (syslog_parser *parser, const char *data, size_t len)")
 def on_msg_part(parser, data, size):
     parser_data = FFI.from_handle(parser.app_data)
@@ -287,6 +295,7 @@ def on_msg_part(parser, data, size):
         parser_data.exception = ex
         return 1
     return 0
+
 
 @FFI.callback("int (syslog_parser *parser)")
 def on_msg_complete(parser):
