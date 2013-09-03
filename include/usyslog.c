@@ -1,4 +1,6 @@
 #include "usyslog.h"
+#include "cstr.h"
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -60,46 +62,6 @@ typedef enum {
 
 
 // Supporting functions
-
-/**
- * Returns a new pbuffer with a char buffer set to the
- * specified size. This function returns NULL if
- * allocation of the pbuffer or its parts fails.
- */
-pbuffer * new_pbuffer(size_t size) {
-    // Allocate a new pbuffer struct
-    pbuffer *buffer = (pbuffer *) malloc(sizeof(pbuffer));
-
-    if (buffer != NULL) {
-        buffer->bytes = (char *) malloc(sizeof(char) * size);
-
-        if (buffer->bytes != NULL) {
-            buffer->position = 0;
-            buffer->size = size;
-        } else {
-            // Allocating the actual char buffer failed
-            // so release the newly allocated struct
-            free(buffer);
-            buffer = NULL;
-        }
-    }
-
-    return buffer;
-}
-
-void reset_pbuffer(pbuffer *buffer) {
-    buffer->position = 0;
-}
-
-void free_pbuffer(pbuffer *buffer) {
-    if (buffer->bytes != NULL) {
-        free(buffer->bytes);
-        buffer->bytes = NULL;
-    }
-
-    free(buffer);
-}
-
 void free_msg_head_fields(syslog_msg_head *head) {
     if (head->timestamp != NULL) {
         free(head->timestamp);
@@ -134,54 +96,6 @@ void reset_msg_head(syslog_msg_head *head) {
     head->version = 0;
 }
 
-int store_byte_in_pbuffer(char byte, pbuffer *dest) {
-    int retval = 0;
-
-    if (dest-> position + 1 < dest->size) {
-        dest->bytes[dest->position] = byte;
-        dest->position += 1;
-    } else {
-        retval = SLERR_BUFFER_OVERFLOW;
-    }
-
-    return retval;
-}
-
-int copy_into_pbuffer(const char *source, pbuffer *dest, size_t length) {
-    int retval = 0;
-
-    if (dest->position + length < dest->size) {
-        memcpy(dest->bytes, source, length);
-        dest->position += length;
-    } else {
-        retval = SLERR_BUFFER_OVERFLOW;
-    }
-
-    return retval;
-}
-
-char * copy_pbuffer(pbuffer *src) {
-    char *new = (char *) malloc(src->position * sizeof(char));
-
-    if (!errno) {
-        memcpy(new, src->bytes, src->position);
-    }
-
-    return new;
-}
-
-char * copy_parser_buffer(syslog_parser *parser) {
-    return copy_pbuffer(parser->buffer);
-}
-
-void reset_buffer(syslog_parser *parser) {
-    reset_pbuffer(parser->buffer);
-}
-
-int store_byte(char byte, syslog_parser *parser) {
-    return store_byte_in_pbuffer(byte, parser->buffer);
-}
-
 void on_cb(syslog_parser *parser, syslog_cb cb) {
     const int error = cb(parser);
 
@@ -191,13 +105,13 @@ void on_cb(syslog_parser *parser, syslog_cb cb) {
 }
 
 void on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
-    const int error = cb(parser, parser->buffer->bytes, parser->buffer->position);
+    const int error = cb(parser, parser->buffer->data->bytes, parser->buffer->position);
 
     if (error) {
         parser->error = SLERR_USER_ERROR;
     }
 
-    reset_buffer(parser);
+    cstr_buff_reset(parser->buffer);
 }
 
 #if DEBUG_OUTPUT
@@ -266,44 +180,39 @@ void set_state(syslog_parser *parser, syslog_state next_state) {
 }
 
 void set_str_field(syslog_parser *parser) {
-    char *value = copy_parser_buffer(parser);
+    const cstr_buff *buffer = parser->buffer;
+
+    cstr *value = cstr_copy_from_cstr(buffer->data, buffer->position);
 
     if (value == NULL) {
         parser->error = SLERR_UNABLE_TO_ALLOCATE;
     } else {
-        int len = parser->buffer->position;
-
         switch (parser->state) {
             case s_timestamp:
                 parser->msg_head->timestamp = value;
-                parser->msg_head->timestamp_len = len;
                 break;
 
             case s_hostname:
                 parser->msg_head->hostname = value;
-                parser->msg_head->hostname_len = len;
                 break;
 
             case s_appname:
                 parser->msg_head->appname = value;
-                parser->msg_head->appname_len = len;
                 break;
 
             case s_processid:
                 parser->msg_head->processid = value;
-                parser->msg_head->processid_len = len;
                 break;
 
             case s_messageid:
                 parser->msg_head->messageid = value;
-                parser->msg_head->messageid_len = len;
                 break;
 
             default:
-                free(value);
+                cstr_free(value);
         }
 
-        reset_buffer(parser);
+        cstr_buff_reset(parser->buffer);
     }
 }
 
@@ -369,7 +278,7 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
             break;
 
         default:
-            store_byte(nb, parser);
+            cstr_buff_put(parser->buffer, nb);
     }
 
     return pa_advance;
@@ -396,7 +305,7 @@ int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char
             break;
 
         default:
-            store_byte(nb, parser);
+            cstr_buff_put(parser->buffer, nb);
     }
 
     return pa_advance;
@@ -404,7 +313,7 @@ int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char
 
 int sd_field_start(syslog_parser *parser, char nb) {
     if (IS_ALPHANUM(nb)) {
-        store_byte(nb, parser);
+        cstr_buff_put(parser->buffer, nb);
         set_state(parser, s_sd_field);
     } else {
         switch (nb) {
@@ -422,7 +331,7 @@ int sd_field_start(syslog_parser *parser, char nb) {
 
 int sd_element(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
     if (!IS_WS(nb)) {
-        store_byte(nb, parser);
+        cstr_buff_put(parser->buffer, nb);
     } else {
         on_data_cb(parser, settings->on_sd_element);
         set_state(parser, s_sd_field_start);
@@ -455,7 +364,7 @@ int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char
 
 int parse_msg_head_part(syslog_parser *parser, syslog_state next_state, char nb) {
     if (!IS_WS(nb)) {
-        store_byte(nb, parser);
+        cstr_buff_put(parser->buffer, nb);
     } else {
         set_str_field(parser);
         set_state(parser, next_state);
@@ -526,7 +435,7 @@ int octet_count(syslog_parser *parser, char nb) {
     int retval = pa_advance;
 
     if (IS_NUM(nb)) {
-        uint32_t mlength = parser->message_length;
+        size_t mlength = parser->message_length;
 
         mlength *= 10;
         mlength += nb - '0';
@@ -705,7 +614,7 @@ void uslg_parser_reset(syslog_parser *parser) {
     parser->flags = 0;
 
     reset_msg_head(parser->msg_head);
-    reset_pbuffer(parser->buffer);
+    cstr_buff_reset(parser->buffer);
 
     set_state(parser, s_msg_start);
     set_token_state(parser, ts_before);
@@ -725,7 +634,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
     memset(parser->msg_head, 0, sizeof(syslog_msg_head));
 
     parser->app_data = app_data;
-    parser->buffer = new_pbuffer(MAX_BUFFER_SIZE);
+    parser->buffer = cstr_buff_new(MAX_BUFFER_SIZE);
 
     if (errno) {
         // Allocating the buffer failed so let go
@@ -742,7 +651,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
 
 void uslg_free_parser(syslog_parser *parser) {
     free_msg_head_fields(parser->msg_head);
-    free_pbuffer(parser->buffer);
+    cstr_buff_free(parser->buffer);
     free(parser->msg_head);
     free(parser);
 }
