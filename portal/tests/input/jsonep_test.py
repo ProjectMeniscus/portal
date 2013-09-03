@@ -1,21 +1,55 @@
 import unittest
 import time
 
-from  portal.input.jsonep import JsonEventHandler, JsonEventParser
+from portal.input.jsonep import JsonEventHandler, JsonEventParser
 
 
-PERFORMANCE_TEST = b'{ "header": "12345", "body": 12345.15 }{ "header": "12345", "body": 1234e+5 }{ "header": "12345", "body": -12345 }{ "header": "12345", "body": null }{ "header": "12345", "body": false }{ "header": "12345", "body": true }'
-FLAT_OBJECT_MULTIPLE_TYPES = b'{ "header": "12345", "body": 12345.15 }{ "header": "12345", "body": 1234e+5 }{ "header": "12345", "body": -12345 }{ "header": "12345", "body": null }{ "header": "12345", "body": false }{ "header": "12345", "body": true }'
-NESTED_OBJECTS = b'{ "header": "12345", "auth": { "token": "yb907n834gyb9708234tvgy9h780", "time": 123878921748 }, "body": "test" }{ "header": "12345", "auth": { "token": "yb907n834gyb9708234tvgy9h780", "time": 123878921748 }, "body": "test" }'
-NESTED_ARRAYS = b'["test", 12345, 12345.01, -12345, 12345e+5, 12345E+4, 12345e-4, 12345E-1, [ "test" ]]'
-COMPLEX_NESTING = b'{"authentication": { "uid": "65c45346-436c-4f1d-8a02-7230fd570760", "token": "569e0670-e798-4e34-be65-23dbcfa81b73" }, "body": ["testing", { "key": "a", "value": 12345 }]}{"authentication": { "uid": "65c45346-436c-4f1d-8a02-7230fd570760", "token": "569e0670-e798-4e34-be65-23dbcfa81b73" }, "body": ["testing", { "key": "a", "value": 12345 }]}'
+PERFORMANCE_TEST = (
+    b'{ "header": "12345", "body": 12345.15 }'
+    b'{ "header": "12345", "body": 1234e+5 }'
+    b'{ "header": "12345", "body": -12345 }'
+    b'{ "header": "12345", "body": null }'
+    b'{ "header": "12345", "body": false }'
+    b'{ "header": "12345", "body": true }'
+)
+FLAT_OBJECT_MULTIPLE_TYPES = (
+    b'{ "header": "12345", "body": 12345.15 }'
+    b'{ "header": "12345", "body": 1234e+5 }'
+    b'{ "header": "12345", "body": -12345 }'
+    b'{ "header": "12345", "body": null }'
+    b'{ "header": "12345", "body": false }'
+    b'{ "header": "12345", "body": true }'
+)
+NESTED_OBJECTS = (
+    b'{ "header": "12345", "auth": '
+    b'{ "token": "yb907n834gyb9708234tvgy9h780", "time": 123878921748 }, '
+    b'"body": "test" }{ "header": "12345", "auth": '
+    b'{ "token": "yb907n834gyb9708234tvgy9h780", "time": 123878921748 }, '
+    b'"body": "test" }'
+)
+NESTED_ARRAYS = (
+    b'["test", 12345, 12345.01, -12345, 12345e+5, '
+    b'12345E+4, 12345e-4, 12345E-1, [ "test" ]]'
+)
+COMPLEX_NESTING = (
+    b'{"authentication": { "uid": "65c45346-436c-4f1d-8a02-7230fd570760", '
+    b'"token": "569e0670-e798-4e34-be65-23dbcfa81b73" }, '
+    b'"body": ["testing", { "key": "a", "value": 12345 }]}'
+    b'{"authentication": { "uid": "65c45346-436c-4f1d-8a02-7230fd570760", '
+    b'"token": "569e0670-e798-4e34-be65-23dbcfa81b73" }, '
+    b'"body": ["testing", { "key": "a", "value": 12345 }]}'
+)
+
 
 class EventValidator(JsonEventHandler):
 
-    def __init__(self, test, expectations=dict()):
+    def __init__(self, test, expectations=None):
         self.test = test
         self.calls = dict()
-        self.expectations = expectations
+        if expectations is None:
+            self.expectations = dict()
+        else:
+            self.expectations = expectations
 
     def _called(self, call, value=None):
         times_called = self.calls.get(call)
@@ -32,9 +66,9 @@ class EventValidator(JsonEventHandler):
             expected = self.expectations.get(call, 0)
             if times_called != expected:
                     output += (
-                            '{} called an unexpected amount of times. '
-                            'Expected: {} - Actual: {}\n'
-                        ).format(call, expected, times_called)
+                        '{} called an unexpected amount of times. '
+                        'Expected: {} - Actual: {}\n'
+                    ).format(call, expected, times_called)
         if len(output) > 0:
             self.test.fail(output)
 
@@ -162,14 +196,15 @@ def performance(duration=10, print_output=True):
     if print_output:
         length_in_bytes = len(data)
         print((
-                'Ran {} times in {} seconds for {} runs per second. '
-                'With a message length of {} bytes, this equals {} MB/sec'
-            ).format(
-                runs,
-                duration,
-                runs / float(duration),
-                length_in_bytes,
-                (length_in_bytes * runs / 1024 / 1024)))
+            'Ran {} times in {} seconds for {} runs per second. '
+            'With a message length of {} bytes, this equals {} MB/sec'
+        ).format(
+            runs,
+            duration,
+            runs / float(duration),
+            length_in_bytes,
+            (length_in_bytes * runs / 1024 / 1024)
+        ))
 
 
 if __name__ == '__main__1':

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -13,29 +12,20 @@
 #define RFC5424_MAX_BYTES       2048
 #define MAX_BUFFER_SIZE         (RFC5424_MAX_BYTES * 32)
 
-#ifndef ULLONG_MAX
-#   define ULLONG_MAX ((uint64_t) -1)   // 2^64-1
-#endif
-
 #define IS_WS(c)            (c ==' ' || c == '\t' || c == '\r' || c == '\n')
-
 #define LOWER(c)            (unsigned char)(c | 0x20)
 #define IS_ALPHA(c)         (LOWER(c) >= 'a' && LOWER(c) <= 'z')
 #define IS_NUM(c)           ((c) >= '0' && (c) <= '9')
 #define IS_ALPHANUM(c)      (IS_ALPHA(c) || IS_NUM(c))
 
-#define IS_HOST_CHAR(c) (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '_')
 
-
+// Typedefs
 typedef enum {
     ts_before,
     ts_read
 } token_state;
 
-
-// States
 typedef enum {
-
     // Message Head
     s_msg_start,
     s_octet_count,
@@ -51,23 +41,22 @@ typedef enum {
     // RFC5424 - SDATA
     s_sd_start,
     s_sd_element,
+    s_sd_field_start,
     s_sd_field,
-    s_sd_field_end,
-    s_sd_value_begin,
+    s_sd_value_start,
     s_sd_value,
     s_sd_value_end,
     s_sd_end,
 
     // Message Content
-    s_message,
-    s_msg_complete
+    s_message
 } syslog_state;
 
 typedef enum {
-    rv_advance,
-    rv_rehash,
-    rv_inc_index
-} syslog_retval;
+    pa_advance,
+    pa_rehash,
+    pa_none
+} parser_action;
 
 
 // Supporting functions
@@ -111,28 +100,38 @@ void free_pbuffer(pbuffer *buffer) {
     free(buffer);
 }
 
-void free_msg_head(syslog_msg_head *head) {
+void free_msg_head_fields(syslog_msg_head *head) {
     if (head->timestamp != NULL) {
         free(head->timestamp);
+        head->timestamp = NULL;
     }
 
     if (head->hostname != NULL) {
         free(head->hostname);
+        head->hostname = NULL;
     }
 
     if (head->appname != NULL) {
         free(head->hostname);
+        head->appname = NULL;
     }
 
     if (head->processid != NULL) {
         free(head->processid);
+        head->processid = NULL;
     }
 
     if (head->messageid != NULL) {
         free(head->messageid);
+        head->messageid = NULL;
     }
+}
 
-    free(head);
+void reset_msg_head(syslog_msg_head *head) {
+    free_msg_head_fields(head);
+
+    head->priority = 0;
+    head->version = 0;
 }
 
 int store_byte_in_pbuffer(char byte, pbuffer *dest) {
@@ -163,7 +162,10 @@ int copy_into_pbuffer(const char *source, pbuffer *dest, size_t length) {
 
 char * copy_pbuffer(pbuffer *src) {
     char *new = (char *) malloc(src->position * sizeof(char));
-    memcpy(new, src->bytes, src->position);
+
+    if (!errno) {
+        memcpy(new, src->bytes, src->position);
+    }
 
     return new;
 }
@@ -180,23 +182,25 @@ int store_byte(char byte, syslog_parser *parser) {
     return store_byte_in_pbuffer(byte, parser->buffer);
 }
 
-int on_cb(syslog_parser *parser, syslog_cb cb) {
-    return cb(parser);
+void on_cb(syslog_parser *parser, syslog_cb cb) {
+    const int error = cb(parser);
+
+    if (error) {
+        parser->error = SLERR_USER_ERROR;
+    }
 }
 
-int on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
-    return cb(parser, parser->buffer->bytes, parser->buffer->position);
+void on_data_cb(syslog_parser *parser, syslog_data_cb cb) {
+    const int error = cb(parser, parser->buffer->bytes, parser->buffer->position);
+
+    if (error) {
+        parser->error = SLERR_USER_ERROR;
+    }
+
+    reset_buffer(parser);
 }
 
-void set_token_state(syslog_parser *parser, token_state next_state) {
-// Print the state switch if we're compiled in DEBUG mode
 #if DEBUG_OUTPUT
-    printf("Setting token state to: %i\n", next_state);
-#endif
-
-    parser->token_state = next_state;
-}
-
 char * get_state_name(syslog_state state) {
     switch (state) {
         case s_msg_start:
@@ -223,24 +227,32 @@ char * get_state_name(syslog_state state) {
             return "sd_start";
         case s_sd_element:
             return "sd_element";
+        case s_sd_field_start:
+            return "sd_field_start";
         case s_sd_field:
             return "sd_field";
-        case s_sd_field_end:
-            return "sd_field_end";
-        case s_sd_value_begin:
-            return "sd_value_begin";
+        case s_sd_value_start:
+            return "sd_value_start";
         case s_sd_value:
             return "sd_value";
         case s_sd_end:
             return "sd_end";
         case s_message:
             return "message";
-        case s_msg_complete:
-            return "msg_complete";
 
         default:
             return "NOT A STATE";
     }
+}
+#endif
+
+void set_token_state(syslog_parser *parser, token_state next_state) {
+// Print the state switch if we're compiled in DEBUG mode
+#if DEBUG_OUTPUT
+    printf("Setting token state to: %i\n", next_state);
+#endif
+
+    parser->token_state = next_state;
 }
 
 void set_state(syslog_parser *parser, syslog_state next_state) {
@@ -255,69 +267,90 @@ void set_state(syslog_parser *parser, syslog_state next_state) {
 
 void set_str_field(syslog_parser *parser) {
     char *value = copy_parser_buffer(parser);
-    int len = parser->buffer->position;
 
-    switch (parser->state) {
-        case s_timestamp:
-            parser->msg_head->timestamp = value;
-            parser->msg_head->timestamp_len = len;
-            break;
+    if (value == NULL) {
+        parser->error = SLERR_UNABLE_TO_ALLOCATE;
+    } else {
+        int len = parser->buffer->position;
 
-        case s_hostname:
-            parser->msg_head->hostname = value;
-            parser->msg_head->hostname_len = len;
-            break;
+        switch (parser->state) {
+            case s_timestamp:
+                parser->msg_head->timestamp = value;
+                parser->msg_head->timestamp_len = len;
+                break;
 
-        case s_appname:
-            parser->msg_head->appname = value;
-            parser->msg_head->appname_len = len;
-            break;
+            case s_hostname:
+                parser->msg_head->hostname = value;
+                parser->msg_head->hostname_len = len;
+                break;
 
-        case s_processid:
-            parser->msg_head->processid = value;
-            parser->msg_head->processid_len = len;
-            break;
+            case s_appname:
+                parser->msg_head->appname = value;
+                parser->msg_head->appname_len = len;
+                break;
 
-        case s_messageid:
-            parser->msg_head->messageid = value;
-            parser->msg_head->messageid_len = len;
-            break;
+            case s_processid:
+                parser->msg_head->processid = value;
+                parser->msg_head->processid_len = len;
+                break;
 
-        default:
-            free(value);
+            case s_messageid:
+                parser->msg_head->messageid = value;
+                parser->msg_head->messageid_len = len;
+                break;
+
+            default:
+                free(value);
+        }
+
+        reset_buffer(parser);
     }
-
-    reset_buffer(parser);
 }
 
+/**
+* Reads the message portion of a syslog message. This function returns an int
+* value representing the number of bytes read from the buffer.
+*/
 int read_message(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
+    bool msg_complete = false;
+    int read;
+
     if (parser->flags & F_COUNT_OCTETS) {
-        if (parser->remaining >= length) {
-            parser->error = settings->on_msg(parser, data, length);
-            parser->remaining -= length;
-        } else {
-            parser->error = settings->on_msg(parser, data, parser->message_length);
-            parser->remaining = 0;
-        }
+        // If we're counting octets then the message ends when we run out of octsts
+        read = parser->octets_remaining >= length ? length : parser->octets_remaining;
+        parser->octets_remaining -= read;
 
-        if (parser->remaining == 0) {
-            set_state(parser, s_msg_complete);
-        }
+        msg_complete = parser->octets_remaining == 0;
     } else {
-        int stop_idx;
-
-        for (stop_idx = 0; stop_idx < length; stop_idx++) {
-            if (data[stop_idx] == '\n') {
-                set_state(parser, s_msg_complete);
+        // If we're not counting octets then the \n character is EOF for the message
+        for (read = 0; read < length; read++) {
+            if (data[read] == '\n') {
+                msg_complete = true;
                 break;
             }
         }
-
-        parser->error = settings->on_msg(parser, data, stop_idx);
-        parser->remaining -= stop_idx;
     }
 
-    return rv_inc_index;
+    if (read > 0) {
+        // If we read something we need to pass it along
+        const int error = settings->on_msg_part(parser, data, read);
+
+        if (error) {
+            parser->error = SLERR_USER_ERROR;
+        }
+    }
+
+    if (!parser->error && msg_complete) {
+        // If there was no error reported and the message is complete, pass it along
+        on_cb(parser, settings->on_msg_complete);
+
+        if (!parser->error) {
+            // If there was no error, set the parser back to a blank slate
+            uslg_parser_reset(parser);
+        }
+    }
+
+    return read;
 }
 
 int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
@@ -330,8 +363,8 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
             if (parser->flags & F_ESCAPED) {
                 parser->flags |= F_ESCAPED;
             } else {
-                parser->error = on_data_cb(parser, settings->on_sd_value);
-                set_state(parser, s_sd_field);
+                on_data_cb(parser, settings->on_sd_value);
+                set_state(parser, s_sd_field_start);
             }
             break;
 
@@ -339,71 +372,69 @@ int sd_value(syslog_parser *parser, const syslog_parser_settings *settings, char
             store_byte(nb, parser);
     }
 
-    return rv_advance;
+    return pa_advance;
 }
 
-int sd_value_begin(syslog_parser *parser, char nb) {
-    int retval = rv_advance;
+int sd_value_start(syslog_parser *parser, char nb) {
+    switch (nb) {
+        case '"':
+            set_state(parser, s_sd_value);
+            break;
 
-    if (nb == '"') {
-        set_state(parser, s_sd_value);
+        default:
+            parser->error = SLERR_BAD_SD_VALUE;
     }
 
-    return retval;
-}
-
-int sd_field_end(syslog_parser *parser, char nb) {
-    int retval = rv_advance;
-
-    if (nb == '=') {
-        set_state(parser, s_sd_value_begin);
-    }
-
-    return retval;
+    return pa_advance;
 }
 
 int sd_field(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    int retval = rv_advance;
+    switch (nb) {
+        case '=':
+            on_data_cb(parser, settings->on_sd_field);
+            set_state(parser, s_sd_value_start);
+            break;
 
+        default:
+            store_byte(nb, parser);
+    }
+
+    return pa_advance;
+}
+
+int sd_field_start(syslog_parser *parser, char nb) {
     if (IS_ALPHANUM(nb)) {
         store_byte(nb, parser);
+        set_state(parser, s_sd_field);
     } else {
-        retval = on_data_cb(parser, settings->on_sd_field);
-
         switch (nb) {
             case ']':
                 set_state(parser, s_sd_start);
                 break;
 
-            case '=':
-                set_state(parser, s_sd_value_begin);
-                break;
-
             default:
-                set_state(parser, s_sd_field_end);
+                parser->error = SLERR_BAD_SD_FIELD;
         }
     }
 
-    return retval;
+    return pa_advance;
 }
 
 int sd_element(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    int retval = rv_advance;
-
     if (!IS_WS(nb)) {
         store_byte(nb, parser);
     } else {
-        retval = on_data_cb(parser, settings->on_sd_element);
-        set_state(parser, s_sd_field);
+        on_data_cb(parser, settings->on_sd_element);
+        set_state(parser, s_sd_field_start);
     }
 
-    return retval;
+    return pa_advance;
 }
 
 int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    int retval = rv_advance;
+    int retval = pa_advance;
 
-    parser->error = on_cb(parser, settings->on_msg_head);
+    on_cb(parser, settings->on_msg_head);
 
     switch (nb) {
         case '[':
@@ -416,7 +447,7 @@ int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char
 
         default:
             set_state(parser, s_message);
-            retval = rv_rehash;
+            retval = pa_rehash;
     }
 
     return retval;
@@ -430,11 +461,11 @@ int parse_msg_head_part(syslog_parser *parser, syslog_state next_state, char nb)
         set_state(parser, next_state);
     }
 
-    return rv_advance;
+    return pa_advance;
 }
 
 int version(syslog_parser *parser, char nb) {
-    int retval = rv_advance;
+    int retval = pa_advance;
 
     if (IS_NUM(nb)) {
         uint16_t nversion = parser->msg_head->version;
@@ -475,7 +506,7 @@ int priority(syslog_parser *parser, char nb) {
         }
     }
 
-    return rv_advance;
+    return pa_advance;
 }
 
 int priority_start(syslog_parser *parser, char nb) {
@@ -488,35 +519,37 @@ int priority_start(syslog_parser *parser, char nb) {
             parser->error = SLERR_BAD_PRIORITY_START;
     }
 
-    return rv_advance;
+    return pa_advance;
 }
 
 int octet_count(syslog_parser *parser, char nb) {
-    int retval = rv_advance;
+    int retval = pa_advance;
 
     if (IS_NUM(nb)) {
-        uint64_t mlength = parser->message_length;
+        uint32_t mlength = parser->message_length;
 
         mlength *= 10;
         mlength += nb - '0';
 
-        if (mlength < parser->message_length || mlength == ULONG_MAX) {
+        if (mlength < parser->message_length || mlength == UINT_MAX) {
             parser->error = SLERR_BAD_OCTET_COUNT;
         } else {
             parser->message_length = mlength;
         }
-    } else {
+    } else if (IS_WS(nb)) {
         parser->flags |= F_COUNT_OCTETS;
-        parser->remaining = parser->message_length + 1;
+        parser->octets_remaining = parser->message_length + 1;
         set_state(parser, s_priority_start);
-        retval = rv_rehash;
+        retval = pa_rehash;
+    } else {
+        parser->error = SLERR_BAD_OCTET_COUNT;
     }
 
     return retval;
 }
 
 int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
-    parser->error = on_cb(parser, settings->on_msg_begin);
+    on_cb(parser, settings->on_msg_begin);
 
     if (IS_NUM(nb)) {
         set_state(parser, s_octet_count);
@@ -524,21 +557,20 @@ int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, cha
         set_state(parser, s_priority);
     }
 
-    return rv_rehash;
+    return pa_rehash;
 }
 
 // Big state switch
 int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settings, const char *data, size_t length) {
-    int action = rv_advance, d_index;
-    bool exit_exec = false;
+    int d_index;
+    int error = 0;
+    char next_byte;
 
-    // Continue in the loop as long as we're told not to exit and there's data to chew on
-    for (d_index = 0; !exit_exec && d_index < length; d_index++) {
-        char next_byte = data[d_index];
-        uint64_t last_remaining = parser->remaining;
+    for (d_index = 0; d_index < length; d_index++) {
+        int action = pa_none;
+        next_byte = data[d_index];
 
 #if DEBUG_OUTPUT
-        // Get the next character being processed during debug
         printf("Next byte: %c\n", next_byte);
 #endif
 
@@ -547,129 +579,136 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
             switch (next_byte) {
                 case ' ':
                 case '\t':
-                    parser->remaining--;
-                    continue;
+                    action = pa_advance;
+                    break;
+
+                case '\r':
+                case '\n':
+                    if (!(parser->flags & F_COUNT_OCTETS)) {
+                        parser->error = SLERR_PREMATURE_MSG_END;
+                    }
+                    break;
 
                 default:
                     set_token_state(parser, ts_read);
+                    action = pa_rehash;
+            }
+        } else {
+            // Parser state
+            switch (parser->state) {
+                case s_msg_start:
+                    action = msg_start(parser, settings, next_byte);
+                    break;
+
+                case s_octet_count:
+                    action = octet_count(parser, next_byte);
+                    break;
+
+                case s_priority_start:
+                    action = priority_start(parser, next_byte);
+                    break;
+
+                case s_priority:
+                    action = priority(parser, next_byte);
+                    break;
+
+                case s_version:
+                    action = version(parser, next_byte);
+                    break;
+
+                case s_timestamp:
+                    action = parse_msg_head_part(parser, s_hostname, next_byte);
+                    break;
+
+                case s_hostname:
+                    action = parse_msg_head_part(parser, s_appname, next_byte);
+                    break;
+
+                case s_appname:
+                    action = parse_msg_head_part(parser, s_processid, next_byte);
+                    break;
+
+                case s_processid:
+                    action = parse_msg_head_part(parser, s_messageid, next_byte);
+                    break;
+
+                case s_messageid:
+                    action = parse_msg_head_part(parser, s_sd_start, next_byte);
+                    break;
+
+                case s_sd_start:
+                    action = sd_start(parser, settings, next_byte);
+                    break;
+
+                case s_sd_element:
+                    action = sd_element(parser, settings, next_byte);
+                    break;
+
+                case s_sd_field_start:
+                    action = sd_field_start(parser, next_byte);
+                    break;
+
+                case s_sd_field:
+                    action = sd_field(parser, settings, next_byte);
+                    break;
+
+                case s_sd_value_start:
+                    action = sd_value_start(parser, next_byte);
+                    break;
+
+                case s_sd_value:
+                    action = sd_value(parser, settings, next_byte);
+                    break;
+
+                case s_message:
+                    d_index += read_message(parser, settings, data + d_index, length - d_index);
+                    break;
+
+                default:
+                    parser->error = SLERR_BAD_STATE;
             }
         }
 
-        switch (parser->state) {
-            case s_msg_start:
-                action = msg_start(parser, settings, next_byte);
-                break;
-
-            case s_octet_count:
-                action = octet_count(parser, next_byte);
-                break;
-
-            case s_priority_start:
-                action = priority_start(parser, next_byte);
-                break;
-
-            case s_priority:
-                action = priority(parser, next_byte);
-                break;
-
-            case s_version:
-                action = version(parser, next_byte);
-                break;
-
-            case s_timestamp:
-                action = parse_msg_head_part(parser, s_hostname, next_byte);
-                break;
-
-            case s_hostname:
-                action = parse_msg_head_part(parser, s_appname, next_byte);
-                break;
-
-            case s_appname:
-                action = parse_msg_head_part(parser, s_processid, next_byte);
-                break;
-
-            case s_processid:
-                action = parse_msg_head_part(parser, s_messageid, next_byte);
-                break;
-
-            case s_messageid:
-                action = parse_msg_head_part(parser, s_sd_start, next_byte);
-                break;
-
-            case s_sd_start:
-                action = sd_start(parser, settings, next_byte);
-                break;
-
-            case s_sd_element:
-                action = sd_element(parser, settings, next_byte);
-                break;
-
-            case s_sd_field:
-                action = sd_field(parser, settings, next_byte);
-                break;
-
-            case s_sd_field_end:
-                action = sd_field_end(parser, next_byte);
-                break;
-
-            case s_sd_value_begin:
-                action = sd_value_begin(parser, next_byte);
-                break;
-
-            case s_sd_value:
-                action = sd_value(parser, settings, next_byte);
-                break;
-
-            case s_message:
-                action = read_message(parser, settings, data + d_index, length - d_index);
-                break;
-
-            default:
-                parser->error = SLERR_BAD_STATE;
-        }
-
+        // Upon error, exit the read loop regardless of action
         if (parser->error) {
-            // An error occured
-            exit_exec = true;
+            error = parser->error;
+            uslg_parser_reset(parser);
             break;
-        } else if (parser->state == s_msg_complete) {
-            parser->error = on_cb(parser, settings->on_msg_complete);
         }
 
+        // What action should be taken for this byte
         switch (action) {
-            case rv_advance:
-                if (parser->state != s_msg_complete) {
-                    parser->remaining--;
-                } else {
-                    parser->error = on_cb(parser, settings->on_msg_complete);
-                    uslg_parser_reset(parser);
+            case pa_advance:
+                if (parser->flags & F_COUNT_OCTETS) {
+                    parser->octets_remaining--;
                 }
+
                 break;
 
-            case rv_inc_index:
-                d_index += (last_remaining - parser->remaining);
-                break;
-
-            case rv_rehash:
+            case pa_rehash:
                 d_index--;
                 break;
         }
     }
 
-    return parser->error;
+    return error;
 }
 
 
 // Exported Functions
 
 void uslg_parser_reset(syslog_parser *parser) {
-    parser->remaining = 0;
+    parser->octets_read = 0;
+    parser->octets_remaining = 0;
+    parser->message_length = 0;
     parser->error = 0;
     parser->flags = 0;
-    parser->message_length = 0;
 
-    parser->state = s_msg_start;
-    parser->token_state = ts_before;
+    reset_msg_head(parser->msg_head);
+    reset_pbuffer(parser->buffer);
+
+    set_state(parser, s_msg_start);
+    set_token_state(parser, ts_before);
 }
 
 int uslg_parser_init(syslog_parser *parser, void *app_data) {
@@ -680,7 +719,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
 
     if (errno) {
         // Allocating the msg_head struct failed!
-        return -1;
+        return SLERR_UNABLE_TO_ALLOCATE;
     }
 
     memset(parser->msg_head, 0, sizeof(syslog_msg_head));
@@ -692,9 +731,9 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
         // Allocating the buffer failed so let go
         // of the memory we just allocated for the
         // msg_head struct
-        free_msg_head(parser->msg_head);
+        free_msg_head_fields(parser->msg_head);
         parser->msg_head = NULL;
-        return -1;
+        return SLERR_UNABLE_TO_ALLOCATE;
     }
 
     uslg_parser_reset(parser);
@@ -702,7 +741,54 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
 }
 
 void uslg_free_parser(syslog_parser *parser) {
-    free_msg_head(parser->msg_head);
+    free_msg_head_fields(parser->msg_head);
     free_pbuffer(parser->buffer);
+    free(parser->msg_head);
     free(parser);
+}
+
+char * uslg_error_string(int error) {
+    switch (error) {
+        case SLERR_UNCAUGHT:
+            return "Uncaught or unknown error.";
+
+        case SLERR_BAD_OCTET_COUNT:
+            return "Octet count on syslog message was bad or malformed.";
+
+        case SLERR_BAD_PRIORITY_START:
+            return "The priority token was not correctly started.";
+
+        case SLERR_BAD_PRIORITY:
+            return "The priority token was bad or malformed.";
+
+        case SLERR_BAD_VERSION:
+            return "The version token was bad or malformed.";
+
+        case SLERR_BAD_SD_START:
+            return "The SDATA token was not started correctly.";
+
+        case SLERR_BAD_SD_FIELD:
+            return "The SDATA field was bad or malformed.";
+
+        case SLERR_BAD_SD_VALUE:
+            return "The SDATA value was bad or malformed.";
+
+        case SLERR_PREMATURE_MSG_END:
+            return "The syslog message was ended with an unescaped delimeter before the parser could reach the message token.";
+
+        case SLERR_BAD_STATE:
+            return "The parser was in a bad state. This should not happen.";
+
+        case SLERR_USER_ERROR:
+            return "The parser encountered an error while running the associated callback.";
+
+        case SLERR_BUFFER_OVERFLOW:
+            return "The parser buffer is not large enough for the data being passed.";
+
+        case SLERR_UNABLE_TO_ALLOCATE:
+            return "Unable to allocate memory.";
+
+        default:
+            return "Unknown error value.";
+    }
 }

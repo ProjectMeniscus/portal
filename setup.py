@@ -69,7 +69,7 @@ if 'build' in sys.argv:
     cythonize()
 
 ext_modules = package_c()
-ext_modules.append(syslog.ffi.verifier.get_extension())
+ext_modules.append(syslog.FFI.verifier.get_extension())
 
 setup(
     name='meniscus-portal',
