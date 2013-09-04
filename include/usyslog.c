@@ -64,27 +64,27 @@ typedef enum {
 // Supporting functions
 void free_msg_head_fields(syslog_msg_head *head) {
     if (head->timestamp != NULL) {
-        free(head->timestamp);
+        cstr_free(head->timestamp);
         head->timestamp = NULL;
     }
 
     if (head->hostname != NULL) {
-        free(head->hostname);
+        cstr_free(head->hostname);
         head->hostname = NULL;
     }
 
     if (head->appname != NULL) {
-        free(head->hostname);
+        cstr_free(head->hostname);
         head->appname = NULL;
     }
 
     if (head->processid != NULL) {
-        free(head->processid);
+        cstr_free(head->processid);
         head->processid = NULL;
     }
 
     if (head->messageid != NULL) {
-        free(head->messageid);
+        cstr_free(head->messageid);
         head->messageid = NULL;
     }
 }
@@ -626,7 +626,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
     // Create the msg_head
     parser->msg_head = (syslog_msg_head *) malloc(sizeof(syslog_msg_head));
 
-    if (errno) {
+    if (parser->msg_head == NULL) {
         // Allocating the msg_head struct failed!
         return SLERR_UNABLE_TO_ALLOCATE;
     }
@@ -636,7 +636,7 @@ int uslg_parser_init(syslog_parser *parser, void *app_data) {
     parser->app_data = app_data;
     parser->buffer = cstr_buff_new(MAX_BUFFER_SIZE);
 
-    if (errno) {
+    if (parser->buffer == NULL) {
         // Allocating the buffer failed so let go
         // of the memory we just allocated for the
         // msg_head struct

@@ -6,14 +6,14 @@
 
 
 cstr * cstr_new(size_t size) {
-    cstr *cstr = malloc(sizeof(cstr));
+    cstr *new_cstr = malloc(sizeof(cstr));
 
     if (!errno) {
-        cstr->bytes = malloc(sizeof(char) * size);
-        cstr->size = size;
+        new_cstr->bytes = malloc(sizeof(char) * size);
+        new_cstr->size = size;
     }
 
-    return cstr;
+    return new_cstr;
 }
 
 void cstr_free(cstr *cstr) {
