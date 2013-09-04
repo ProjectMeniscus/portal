@@ -74,7 +74,7 @@ void free_msg_head_fields(syslog_msg_head *head) {
     }
 
     if (head->appname != NULL) {
-        cstr_free(head->hostname);
+        cstr_free(head->appname);
         head->appname = NULL;
     }
 
