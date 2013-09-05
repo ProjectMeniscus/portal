@@ -62,10 +62,10 @@ struct syslog_msg_head {
 
 struct syslog_parser_settings {
     syslog_cb         on_msg_begin;
-    syslog_cb         on_msg_head;
     syslog_data_cb    on_sd_element;
     syslog_data_cb    on_sd_field;
     syslog_data_cb    on_sd_value;
+    syslog_cb         on_msg_head_complete;
     syslog_data_cb    on_msg_part;
     syslog_cb         on_msg_complete;
 };

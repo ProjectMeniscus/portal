@@ -343,8 +343,6 @@ int sd_element(syslog_parser *parser, const syslog_parser_settings *settings, ch
 int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char nb) {
     int retval = pa_advance;
 
-    on_cb(parser, settings->on_msg_head);
-
     switch (nb) {
         case '[':
             set_state(parser, s_sd_element);
@@ -352,10 +350,12 @@ int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char
 
         case '-':
             set_state(parser, s_message);
+            on_cb(parser, settings->on_msg_head_complete);
             break;
 
         default:
             set_state(parser, s_message);
+            on_cb(parser, settings->on_msg_head_complete);
             retval = pa_rehash;
     }
 
@@ -615,7 +615,6 @@ void uslg_parser_reset(syslog_parser *parser) {
 
     reset_msg_head(parser->msg_head);
     cstr_buff_reset(parser->buffer);
-
     set_state(parser, s_msg_start);
     set_token_state(parser, ts_before);
 }

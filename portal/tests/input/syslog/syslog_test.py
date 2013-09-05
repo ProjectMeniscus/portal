@@ -58,7 +58,7 @@ class MessageValidator(SyslogMessageHandler):
     def __init__(self, test):
         self.test = test
         self.times_called = 0
-        self.msg = ''
+        self.msg = bytearray()
         self.msg_head = None
         self.complete = False
         self.caught_exception = None
@@ -75,7 +75,7 @@ class MessageValidator(SyslogMessageHandler):
         self.call_received()
 
     def on_msg_part(self, msg_part):
-        self.msg += msg_part
+        self.msg.extend(msg_part)
 
     def on_msg_complete(self):
         self.complete = True
@@ -253,4 +253,4 @@ if __name__ == '__main__1':
 
 if __name__ == '__main__':
     print('Executing performance test')
-    performance()
+    performance(4)

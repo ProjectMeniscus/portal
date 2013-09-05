@@ -9,7 +9,7 @@ extern "C" {
 
 // Errors
 typedef enum {
-    CSTR_BUFFER_OVERFLOW = 0
+    CSTR_BUFFER_OVERFLOW = 200
 } cstr_error;
 
 

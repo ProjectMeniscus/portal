@@ -1,6 +1,7 @@
 #include "cstr.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <string.h>
 
@@ -8,7 +9,7 @@
 cstr * cstr_new(size_t size) {
     cstr *new_cstr = malloc(sizeof(cstr));
 
-    if (!errno) {
+    if (new_cstr != NULL) {
         new_cstr->bytes = malloc(sizeof(char) * size);
         new_cstr->size = size;
     }
@@ -33,7 +34,7 @@ cstr * cstr_copy_from_cstr(cstr *src, size_t size) {
 cstr * cstr_copy_from_char(char *string, size_t size) {
     cstr *copy = cstr_new(size);
 
-    if (!errno) {
+    if (copy != NULL) {
         memcpy(copy->bytes, string, size);
     }
 
@@ -80,7 +81,7 @@ int cstr_buff_put(cstr_buff *buffer, char src) {
         buffer->data->bytes[buffer->position] = src;
         buffer->position = next_position;
     } else {
-        retval = -1;
+        retval = CSTR_BUFFER_OVERFLOW;
     }
 
     return retval;
