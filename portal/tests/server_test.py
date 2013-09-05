@@ -3,28 +3,11 @@ import simplejson as json
 from multiprocessing import Process
 
 from portal.env import get_logger
-from portal.server import start_io, SyslogServer, JsonStreamServer
+from portal.server import start_io, SyslogServer
 from portal.input.syslog import SyslogMessageHandler
-from portal.input.jsonstream import JsonMessageHandler
 
 
 _LOG = get_logger('portal.tests.server_test')
-
-
-class JsonHandler(JsonMessageHandler):
-
-    def __init__(self):
-        self.msg_count = 0
-
-    def header(self, key, value):
-        #_LOG.debug('Header: {} = {}'.format(key, value))
-        pass
-
-    def body(self, body):
-        #_LOG.debug('Message body: {}'.format(body))
-        self.msg_count += 1
-        if self.msg_count % 10000 == 0:
-            _LOG.debug('Processed {} messages.'.format(self.msg_count))
 
 
 class MessageHandler(SyslogMessageHandler):
@@ -52,7 +35,5 @@ class MessageHandler(SyslogMessageHandler):
 
 if __name__ == "__main__":
     syslog_server = SyslogServer(("127.0.0.1", 5140), MessageHandler())
-    json_server = JsonStreamServer(("127.0.0.1", 9001), JsonHandler())
     syslog_server.start()
-    json_server.start()
     start_io()

@@ -5,12 +5,12 @@
 extern "C" {
 #endif
 
+#include "cstr.h"
 #include <stdint.h>
 #include <sys/types.h>
 
 
 // Typedefs
-typedef struct pbuffer pbuffer;
 typedef struct syslog_parser syslog_parser;
 typedef struct syslog_msg_head syslog_msg_head;
 typedef struct syslog_parser_settings syslog_parser_settings;
@@ -42,46 +42,30 @@ enum USYSLOG_ERROR {
     SLERR_BAD_STATE = 100,
     SLERR_USER_ERROR = 101,
 
-    SLERR_BUFFER_OVERFLOW = 200,
+    SLERR_BUFFER_OVERFLOW = CSTR_BUFFER_OVERFLOW,
     SLERR_UNABLE_TO_ALLOCATE = 201
 };
 
 
 // Structs
-struct pbuffer {
-    char *bytes;
-    size_t position;
-    size_t size;
-};
-
 struct syslog_msg_head {
     // Numeric Fields
     uint16_t priority;
     uint16_t version;
 
-    // String Fields
-    char *timestamp;
-    size_t timestamp_len;
-
-    char *hostname;
-    size_t hostname_len;
-
-    char *appname;
-    size_t appname_len;
-
-    char *processid;
-    size_t processid_len;
-
-    char *messageid;
-    size_t messageid_len;
+    cstr *timestamp;
+    cstr *hostname;
+    cstr *appname;
+    cstr *processid;
+    cstr *messageid;
 };
 
 struct syslog_parser_settings {
     syslog_cb         on_msg_begin;
-    syslog_cb         on_msg_head;
     syslog_data_cb    on_sd_element;
     syslog_data_cb    on_sd_field;
     syslog_data_cb    on_sd_value;
+    syslog_cb         on_msg_head_complete;
     syslog_data_cb    on_msg_part;
     syslog_cb         on_msg_complete;
 };
@@ -99,12 +83,12 @@ struct syslog_parser {
     struct syslog_msg_head *msg_head;
 
     // Byte tracking fields
-    uint32_t message_length;
-    uint32_t octets_remaining;
-    uint32_t octets_read;
+    size_t message_length;
+    size_t octets_remaining;
+    size_t octets_read;
 
     // Buffer
-    pbuffer *buffer;
+    cstr_buff *buffer;
 
     // Optionally settable application data pointer
     void *app_data;

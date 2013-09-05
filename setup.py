@@ -2,10 +2,7 @@
 import sys
 import os
 
-import portal.input.syslog as syslog
-
 from setuptools import setup, find_packages
-from setuptools.command import easy_install
 from distutils.extension import Extension
 
 try:
@@ -14,6 +11,14 @@ try:
     has_cython = True
 except ImportError:
     has_cython = False
+
+
+COMPILER_ARGS = list()
+
+DEBUG = os.getenv('DEBUG')
+
+if DEBUG and DEBUG.lower() == 'true':
+    COMPILER_ARGS.append('-D DEBUG_OUTPUT')
 
 
 def read(relative):
@@ -47,19 +52,16 @@ def cythonize():
 
 
 def package_c():
-    missing_modules = list()
     extensions = list()
-
-    for module in read('./tools/cython-modules'):
-        c_files = module_files(module, 'c')
-        if len(c_files) > 0:
-            c_ext = Extension(module, c_files)
-            extensions.append(c_ext)
-        else:
-            missing_modules.append(module)
-
-    if len(missing_modules) > 0:
-        fail_build('Missing C files for modules {}'.format(missing_modules))
+    extensions.append(Extension(
+        'portal.input.syslog.usyslog',
+        include_dirs=['include/'],
+        sources=[
+            'include/usyslog.c',
+            'include/cstr.c',
+            'portal/input/syslog/usyslog.c'
+        ],
+        extra_compile_args=COMPILER_ARGS))
     return extensions
 
 ext_modules = None
@@ -69,7 +71,6 @@ if 'build' in sys.argv:
     cythonize()
 
 ext_modules = package_c()
-ext_modules.append(syslog.FFI.verifier.get_extension())
 
 setup(
     name='meniscus-portal',
