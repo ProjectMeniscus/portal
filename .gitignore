@@ -7,7 +7,7 @@ dist/
 .idea
 *.iml
 *.egg-info/
-portal/input/*.c
+portal/input/syslog/*.c
 *~
 #*
 .tox

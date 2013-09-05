@@ -3,9 +3,7 @@ from .env import get_logger
 from tornado.ioloop import IOLoop
 from tornado.tcpserver import TCPServer
 
-from portal.input.syslog import Parser
-from portal.input.jsonep import JsonEventParser
-from portal.input.jsonstream import JsonMessageAssembler
+from portal.input.syslog import Parser, SyslogMessageHandler
 
 
 _LOG = get_logger(__name__)
@@ -44,17 +42,6 @@ class TornadoTcpServer(TCPServer):
         self.bind(self.address[1], self.address[0])
         super(TornadoTcpServer, self).start()
         _LOG.info('TCP server ready!')
-
-
-class JsonStreamServer(TornadoTcpServer):
-
-    def __init__(self, address, msg_delegate, ssl_options=None):
-        super(JsonStreamServer, self).__init__(address, ssl_options)
-        self.msg_delegate = msg_delegate
-
-    def handle_stream(self, stream, address):
-        reader = JsonEventParser(JsonMessageAssembler(self.msg_delegate))
-        TornadoConnection(reader, stream, address)
 
 
 class SyslogServer(TornadoTcpServer):
