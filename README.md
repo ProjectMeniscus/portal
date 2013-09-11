@@ -5,7 +5,8 @@ Moving data quickly
 ```bash
 pip install -r tools/pip-requires
 pip install -r tools/test-requires
-python setup.py build_ext --inplace
+pip install -r tools/dev-requires
+python setup.py build && python setup.py build_ext --inplace
 nosetests
 ```
 
