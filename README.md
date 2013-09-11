@@ -1,3 +1,5 @@
+[![Build Status](http://jenkins.projectmeniscus.org/job/Portal/badge/icon)](http://jenkins.projectmeniscus.org/job/Portal/)
+
 # Meniscus Portal
 Moving data quickly
 
