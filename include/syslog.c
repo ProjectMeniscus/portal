@@ -1,4 +1,4 @@
-#include "usyslog.h"
+#include "syslog.h"
 #include "cstr.h"
 
 #include <stddef.h>

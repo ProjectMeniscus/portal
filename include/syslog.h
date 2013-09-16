@@ -1,5 +1,5 @@
-#ifndef usyslog_h
-#define usyslog_h
+#ifndef syslog_h
+#define syslog_h
 
 #ifdef __cplusplus
 extern "C" {
