@@ -57,7 +57,7 @@ def package_c():
         'portal.input.syslog.usyslog',
         include_dirs=['include/'],
         sources=[
-            'include/usyslog.c',
+            'include/syslog.c',
             'include/cstr.c',
             'portal/input/syslog/usyslog.c'
         ],
@@ -74,7 +74,7 @@ ext_modules = package_c()
 
 setup(
     name='meniscus-portal',
-    version='0.2.1.0',
+    version='0.2.1.3',
     description='low level parsing bindings for meniscus',
     author='John Hopper',
     author_email='john.hopper@jpserver.net',

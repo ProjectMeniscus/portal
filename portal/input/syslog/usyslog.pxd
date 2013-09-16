@@ -11,7 +11,7 @@ cdef extern from "cstr.h":
         size_t position
 
 
-cdef extern from "usyslog.h":
+cdef extern from "syslog.h":
 
     cdef struct syslog_msg_head:
         uint16_t priority
