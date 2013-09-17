@@ -16,7 +16,7 @@ SHORT_OCTET_COUNT = (
     b'28 <46>1 - tohru - 6611 - - start')
 
 ACTUAL_MESSAGE = (
-    b'158 <46>1 2013-04-02T14:12:04.873490-05:00 tohru rsyslogd - - - '
+    b'158 <47>1 2013-04-02T14:12:04.873490-05:00 tohru rsyslogd - - - '
     b'[origin software="rsyslogd" swVersion="7.2.5" x-pid="12662" x-info='
     b'"http://www.rsyslog.com"] start')
 
@@ -95,10 +95,19 @@ class MessageValidator(SyslogMessageHandler):
         raise NotImplementedError
 
 
+class BackToBackValidator(MessageValidator):
+
+    def _validate(self, test, caught_exception, msg_head, msg):
+        if msg_head.priority == '46':
+            test.assertEqual(2, len(msg_head.sd))
+        elif msg_head.priority == '47':
+            test.assertEqual(0, len(msg_head.sd))
+
+
 class ActualValidator(MessageValidator):
 
     def _validate(self, test, caught_exception, msg_head, msg):
-        test.assertEqual('46', msg_head.priority)
+        test.assertEqual('47', msg_head.priority)
         test.assertEqual('1', msg_head.version)
         test.assertEqual('2013-04-02T14:12:04.873490-05:00',
                          msg_head.timestamp)
@@ -223,13 +232,18 @@ class WhenParsingSyslog(unittest.TestCase):
         validator.validate()
 
     def test_read_messages_back_to_back(self):
-        validator = ActualValidator(self)
+        validator = BackToBackValidator(self)
         parser = Parser(validator)
 
+        chunk_message(HAPPY_PATH_MESSAGE, parser)
+        validator.validate()
         chunk_message(ACTUAL_MESSAGE, parser)
+        validator.validate()
+        chunk_message(HAPPY_PATH_MESSAGE, parser)
+        validator.validate()
         chunk_message(ACTUAL_MESSAGE, parser)
-        chunk_message(ACTUAL_MESSAGE, parser)
-        chunk_message(ACTUAL_MESSAGE, parser)
+        validator.validate()
+
         self.assertEqual(4, validator.times_called)
 
 
@@ -248,9 +262,9 @@ def performance(duration=10, print_output=True):
             runs / float(duration)))
 
 
-if __name__ == '__main__1':
+if __name__ == '__main__':
     unittest.main()
 
-if __name__ == '__main__':
+if __name__ == 'performance':
     print('Executing performance test')
     performance(4)
