@@ -100,6 +100,8 @@ class SyslogMessageHead(object):
 
 
 cdef int on_msg_begin(syslog_parser *parser):
+    cdef object parser_data = <object> parser.app_data
+    parser_data.msg_head.reset()
     return 0
 
 
