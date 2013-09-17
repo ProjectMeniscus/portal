@@ -17,17 +17,16 @@ class MessageHandler(SyslogMessageHandler):
         self.msg_head = None
         self.msg_count = 0
 
-    def message_head(self, message_head):
+    def on_msg_head(self, message_head):
         self.msg_count += 1
         self.msg_head = message_head
 
-    def message_part(self, message_part):
+    def on_msg_part(self, message_part):
         self.msg += message_part
 
-    def message_complete(self, last_message_part):
+    def on_msg_complete(self):
         message_dict = self.msg_head.as_dict()
-        message_dict['message'] = (
-            self.msg + last_message_part).decode('utf-8')
+        message_dict['message'] = self.msg.decode('utf-8')
         _LOG.debug('Message: {}'.format(json.dumps(message_dict)))
         self.msg_head = None
         self.msg = b''
