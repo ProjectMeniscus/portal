@@ -5,7 +5,6 @@ from portal.input.syslog import (
     SyslogMessageHandler, Parser, ParsingError
 )
 
-
 BAD_OCTET_COUNT = (
     b'2A <46>1 - tohru - 6611 - - start')
 
