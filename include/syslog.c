@@ -571,6 +571,7 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
 
                 case s_message:
                     d_index += read_message(parser, settings, data + d_index, length - d_index);
+                    action = pa_rehash;
                     break;
 
                 default:
