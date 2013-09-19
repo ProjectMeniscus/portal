@@ -44,7 +44,7 @@ class SyslogMessageHandler(object):
     def on_msg_part(self, message_part):
         pass
 
-    def on_msg_complete(self):
+    def on_msg_complete(self, message_size):
         pass
 
 
@@ -94,14 +94,15 @@ class SyslogMessageHead(object):
         for sd_name in self.sd:
             sd_copy[sd_name] = dict()
             for sd_fieldname in self.sd[sd_name]:
-                sd_copy[sd_name][sd_fieldname] = self.sd[
-                    sd_name][sd_fieldname].decode('utf-8')
+                value = self.sd[sd_name][sd_fieldname]
+                sd_copy[sd_name][sd_fieldname] = value.decode('utf-8')
         return dictionary
 
 
 cdef int on_msg_begin(syslog_parser *parser):
     cdef object parser_data = <object> parser.app_data
     parser_data.msg_head.reset()
+
     return 0
 
 
@@ -186,7 +187,7 @@ cdef int on_msg_complete(syslog_parser *parser):
     cdef object parser_data = <object> parser.app_data
 
     try:
-        parser_data.msg_handler.on_msg_complete()
+        parser_data.msg_handler.on_msg_complete(parser.message_length)
     except Exception:
         return -1
     return 0

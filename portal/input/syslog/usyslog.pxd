@@ -25,6 +25,7 @@ cdef extern from "syslog.h":
 
     cdef struct syslog_parser:
         syslog_msg_head *msg_head
+        size_t message_length
         void *app_data
 
     ctypedef int (*syslog_cb) (syslog_parser *parser)

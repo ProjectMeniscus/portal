@@ -231,13 +231,19 @@ int read_message(syslog_parser *parser, const syslog_parser_settings *settings, 
 
         msg_complete = parser->octets_remaining == 0;
     } else {
+        int d_index;
+
         // If we're not counting octets then the \n character is EOF for the message
-        for (read = 0; read < length; read++) {
-            if (data[read] == '\n') {
+        for (d_index = 0; d_index < length; d_index++) {
+            if (data[d_index] == '\n') {
                 msg_complete = true;
                 break;
             }
         }
+
+        // We've read index + 1 number of bytes
+        read = d_index + 1;
+        parser->message_length += read;
     }
 
     if (read > 0) {
@@ -435,20 +441,23 @@ int octet_count(syslog_parser *parser, char nb) {
     int retval = pa_advance;
 
     if (IS_NUM(nb)) {
-        size_t mlength = parser->message_length;
+        size_t mlength = parser->octets_remaining;
 
         mlength *= 10;
         mlength += nb - '0';
 
-        if (mlength < parser->message_length || mlength == UINT_MAX) {
+        if (mlength < parser->octets_remaining || mlength == UINT_MAX) {
             parser->error = SLERR_BAD_OCTET_COUNT;
         } else {
-            parser->message_length = mlength;
+            parser->octets_remaining = mlength;
         }
     } else if (IS_WS(nb)) {
         parser->flags |= F_COUNT_OCTETS;
-        parser->octets_remaining = parser->message_length + 1;
+        parser->octets_remaining += 1;
+        parser->message_length += parser->octets_remaining;
+
         set_state(parser, s_priority_start);
+
         retval = pa_rehash;
     } else {
         parser->error = SLERR_BAD_OCTET_COUNT;
@@ -463,7 +472,7 @@ int msg_start(syslog_parser *parser, const syslog_parser_settings *settings, cha
     if (IS_NUM(nb)) {
         set_state(parser, s_octet_count);
     } else {
-        set_state(parser, s_priority);
+        set_state(parser, s_priority_start);
     }
 
     return pa_rehash;
@@ -591,6 +600,8 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
             case pa_advance:
                 if (parser->flags & F_COUNT_OCTETS) {
                     parser->octets_remaining--;
+                } else {
+                    parser->message_length++;
                 }
 
                 break;
