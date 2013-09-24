@@ -44,6 +44,6 @@ cdef extern from "syslog.h":
     void uslg_free_parser(syslog_parser *parser)
 
     int uslg_parser_init(syslog_parser *parser, void *app_data)
-    int uslg_parser_exec(syslog_parser *parser, syslog_parser_settings *settings, char *data, size_t length)
+    int uslg_parser_exec(syslog_parser *parser, syslog_parser_settings *settings, char *data, size_t length) except 101
 
     char * uslg_error_string(int error)

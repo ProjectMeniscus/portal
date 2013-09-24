@@ -99,47 +99,37 @@ class SyslogMessageHead(object):
         return dictionary
 
 
-cdef int on_msg_begin(syslog_parser *parser):
+cdef int on_msg_begin(syslog_parser *parser) except -1:
     cdef object parser_data = <object> parser.app_data
     parser_data.msg_head.reset()
-
     return 0
 
 
-cdef int on_sd_element(syslog_parser *parser, char *data, size_t size):
+cdef int on_sd_element(syslog_parser *parser, char *data, size_t size) except -1:
     cdef object parser_data = <object> parser.app_data
     cdef object pystr = PyBytes_FromStringAndSize(data, size)
 
-    try:
-        parser_data.msg_head.create_sde(pystr)
-    except Exception:
-        return -1
+    parser_data.msg_head.create_sde(pystr)
     return 0
 
 
-cdef int on_sd_field(syslog_parser *parser, char *data, size_t size):
+cdef int on_sd_field(syslog_parser *parser, char *data, size_t size) except -1:
     cdef object parser_data = <object> parser.app_data
     cdef object pystr = PyBytes_FromStringAndSize(data, size)
 
-    try:
-        parser_data.msg_head.set_sd_field(pystr)
-    except Exception:
-        return -1
+    parser_data.msg_head.set_sd_field(pystr)
     return 0
 
 
-cdef int on_sd_value(syslog_parser *parser, char *data, size_t size):
+cdef int on_sd_value(syslog_parser *parser, char *data, size_t size) except -1:
     cdef object parser_data = <object> parser.app_data
     cdef object pystr = PyBytes_FromStringAndSize(data, size)
 
-    try:
-        parser_data.msg_head.set_sd_value(pystr)
-    except Exception:
-        return -1
+    parser_data.msg_head.set_sd_value(pystr)
     return 0
 
 
-cdef int on_msg_head_complete(syslog_parser *parser):
+cdef int on_msg_head_complete(syslog_parser *parser) except -1:
     cdef object parser_data = <object> parser.app_data
 
     parser_data.msg_head.priority = str(parser.msg_head.priority)
@@ -165,31 +155,22 @@ cdef int on_msg_head_complete(syslog_parser *parser):
         parser.msg_head.messageid.bytes,
         parser.msg_head.messageid.size)
 
-    try:
-        parser_data.msg_handler.on_msg_head(parser_data.msg_head)
-    except Exception:
-        return -1
+    parser_data.msg_handler.on_msg_head(parser_data.msg_head)
     return 0
 
 
-cdef int on_msg_part(syslog_parser *parser, char *data, size_t size):
+cdef int on_msg_part(syslog_parser *parser, char *data, size_t size) except -1:
     cdef object parser_data = <object> parser.app_data
     cdef object pystr = PyBytes_FromStringAndSize(data, size)
 
-    try:
-        parser_data.msg_handler.on_msg_part(pystr)
-    except Exception:
-        return -1
+    parser_data.msg_handler.on_msg_part(pystr)
     return 0
 
 
-cdef int on_msg_complete(syslog_parser *parser):
+cdef int on_msg_complete(syslog_parser *parser) except -1:
     cdef object parser_data = <object> parser.app_data
 
-    try:
-        parser_data.msg_handler.on_msg_complete(parser.message_length)
-    except Exception:
-        return -1
+    parser_data.msg_handler.on_msg_complete(parser.message_length)
     return 0
 
 
@@ -231,11 +212,14 @@ cdef class Parser(object):
         elif isinstance(data, unicode):
             strval = data.encode('utf-8')
 
-        result = uslg_parser_exec(
-            self._cparser,
-            self._cparser_settings,
-            strval,
-            len(strval))
+        try:
+            result = uslg_parser_exec(
+                self._cparser,
+                self._cparser_settings,
+                strval,
+                len(strval))
+        except Exception as ex:
+            raise
 
         if result:
             error_pystr = PyBytes_FromString(uslg_error_string(result))

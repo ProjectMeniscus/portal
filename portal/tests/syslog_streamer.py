@@ -2,12 +2,14 @@ import time
 import signal
 import socket
 
+import multiprocessing
+
 MESSAGE = (
     b'158 <46>1 2013-04-02T14:12:04.873490-05:00 tohru rsyslogd - - - '
     b'[origin software="rsyslogd" swVersion="7.2.5" x-pid="12662" x-info='
     b'"http://www.rsyslog.com"] start')
 
-TEST_DURATION = 10
+TEST_DURATION = 25
 OUTPUT = str('Sent {} messages in {} seconds at a rate of {} messages/sec '
              'for a total of {} MB at {} MB/sec')
 
@@ -30,7 +32,7 @@ def run(sock):
         print(ex)
     finally:
         sock.close()
-    megs_sent = sent * 158 / 1024 / 1024
+    megs_sent = sent * 158.0 / 1024.0 / 1024.0
     print(OUTPUT.format(
         sent,
         TEST_DURATION,
@@ -43,4 +45,8 @@ signal.signal(signal.SIGINT, exit_run)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(('127.0.0.1', 5140))
-run(sock)
+
+multiprocessing.Process(target=run, args=(sock,)).start()
+multiprocessing.Process(target=run, args=(sock,)).start()
+multiprocessing.Process(target=run, args=(sock,)).start()
+multiprocessing.Process(target=run, args=(sock,)).start()
