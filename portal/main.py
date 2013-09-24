@@ -1,7 +1,5 @@
 import signal
 
-import portal.server
-import portal.zmq_server
 import portal.config as config
 
 from portal.log import get_logger, get_log_manager
