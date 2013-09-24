@@ -28,8 +28,12 @@ if [ ${#} -gt 0 ]; then
 fi
 
 if [ ${UPLOAD_TO_PYPI} -eq 0 ]; then
-    echo 'Doing a dry run of the release process...'
+    echo 'About to perform a dry run of the portal release...'
+else
+    echo 'About to perform an actual release of portal...'
 fi
+
+sleep 4
 
 # Clean the dist and directories
 rm -rf dist/*

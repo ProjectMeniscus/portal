@@ -1,4 +1,4 @@
-from .env import get_logger
+from portal.log import get_logger
 
 from tornado.ioloop import IOLoop
 from tornado.tcpserver import TCPServer
@@ -19,14 +19,14 @@ class TornadoConnection(object):
         # Set our callbacks
         self.stream.set_close_callback(self._on_close)
         self.stream.read_until_close(
-            callback=self._on_read,
+            callback=self._on_stream,
             streaming_callback=self._on_stream)
 
     def _on_stream(self, data):
-        self.reader.read(data)
-
-    def _on_read(self, data):
-        pass
+        try:
+            self.reader.read(data)
+        except Exception as ex:
+            _LOG.exception(ex)
 
     def _on_close(self):
         pass
@@ -56,3 +56,7 @@ class SyslogServer(TornadoTcpServer):
 
 def start_io():
     IOLoop.instance().start()
+
+
+def stop_io():
+    IOLoop.instance().stop()

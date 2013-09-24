@@ -2,7 +2,7 @@ import simplejson as json
 
 from multiprocessing import Process
 
-from portal.env import get_logger
+from portal.log import get_logger
 from portal.server import start_io, SyslogServer
 from portal.input.syslog import SyslogMessageHandler
 
