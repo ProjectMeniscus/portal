@@ -29,7 +29,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 case "$1" in
   start)
         echo -n "Starting daemon: "$NAME
-        start-stop-daemon --start --chdir $APPDIR --quiet --chuid $USER --make-pidfile --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
+        start-stop-daemon --start --background --chdir $APPDIR --quiet --chuid $USER --make-pidfile --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
         echo "."
     ;;
   stop)
@@ -40,7 +40,7 @@ case "$1" in
   restart)
         echo -n "Restarting daemon: "$NAME
         start-stop-daemon --stop --chdir $APPDIR --quiet --chuid $USER --oknodo --retry 30 --pidfile $PIDFILE
-        start-stop-daemon --start --chdir $APPDIR --quiet --chuid $USER --make-pidfile --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
+        start-stop-daemon --start --background --chdir $APPDIR --quiet --chuid $USER --make-pidfile --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
         echo "."
     ;;
 
