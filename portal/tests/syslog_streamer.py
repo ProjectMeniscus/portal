@@ -9,7 +9,7 @@ MESSAGE = (
     b'[origin software="rsyslogd" swVersion="7.2.5" x-pid="12662" x-info='
     b'"http://www.rsyslog.com"] start')
 
-TEST_DURATION = 25
+TEST_DURATION = 60
 OUTPUT = str('Sent {} messages in {} seconds at a rate of {} messages/sec '
              'for a total of {} MB at {} MB/sec')
 
