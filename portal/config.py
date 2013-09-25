@@ -29,7 +29,7 @@ def _host_tuple(host_str):
     return None
 
 
-def load_config(location='/etc/meniscus/portal.conf'):
+def load_config(location='/etc/meniscus-portal/portal.conf'):
     if not os.path.isfile(location):
         raise Exception(
             'Unable to locate configuration file: {}'.format(location))

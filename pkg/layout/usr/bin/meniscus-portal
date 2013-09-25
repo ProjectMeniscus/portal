@@ -1,4 +1,4 @@
 #!/bin/sh
 
 PORTAL_SHARE=/usr/share/meniscus-portal
-PYTHONPATH=${PORTAL_SHARE}/lib/python/:${PYTHONPATH} python PORTAL_SHARE/bin/main.py
+PYTHONPATH=${PORTAL_SHARE}/lib/python/:${PYTHONPATH} python ${PORTAL_SHARE}/bin/main.py
