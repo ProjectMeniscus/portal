@@ -11,7 +11,7 @@ _CFG_DEFAULTS = {
     },
     'logging': {
         'console': True,
-        'logfile': '/var/log/meniscus/portal.log',
+        'logfile': '/var/log/meniscus-portal/portal.log',
         'verbosity': 'WARNING'
     }
 }
