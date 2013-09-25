@@ -17,14 +17,17 @@
 
 set -e
 
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+PORTAL_SHARE=/usr/share/meniscus-portal
+
 NAME=meniscus-portal
 PIDFILE=/var/run/${NAME}.pid
-DAEMON="/usr/bin/${NAME}"
-DAEMON_OPTS=""
+DAEMON="python"
+DAEMON_OPTS="${PORTAL_SHARE}/bin/main.py"
 USER=${NAME}
 APPDIR=/var/lib/${NAME}
 
-PATH=/sbin:/usr/sbin:/bin:/usr/bin
+export PYTHONPATH=${PORTAL_SHARE}/lib/python/:${PYTHONPATH}
 
 case "$1" in
   start)
