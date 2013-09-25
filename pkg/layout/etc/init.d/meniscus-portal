@@ -21,7 +21,7 @@ NAME=meniscus-portal
 PIDFILE=/var/run/${NAME}.pid
 DAEMON="/usr/bin/${NAME}"
 DAEMON_OPTS=""
-USER=${meniscus-portal}
+USER=${NAME}
 APPDIR=/var/lib/${NAME}
 
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
