@@ -218,14 +218,6 @@ def build(requirements_file, hooks, project_name, version):
     # Copy the built virtualenv
     copytree(bctx.build.dist, bctx.deploy.project_share)
 
-    # Copy the init script
-    init_script_name = '{}.init'.format(project_name)
-    init_script_path = path.join(path.join('.', 'pkg'), init_script_name)
-
-    shutil.copyfile(
-        init_script_path,
-        path.join(bctx.deploy.init_d, project_name))
-
     # Let's build a tarfile
     tar_filename = '{}_{}.tar.gz'.format(project_name, version)
     tar_fpath = path.join(bctx.root, tar_filename)
