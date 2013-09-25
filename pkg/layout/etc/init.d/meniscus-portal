@@ -22,7 +22,7 @@ PORTAL_SHARE=/usr/share/meniscus-portal
 
 NAME=meniscus-portal
 PIDFILE=/var/run/${NAME}.pid
-DAEMON="python"
+DAEMON="/usr/bin/python"
 DAEMON_OPTS="${PORTAL_SHARE}/bin/main.py"
 USER=${NAME}
 APPDIR=/var/lib/${NAME}
