@@ -25,7 +25,7 @@ def _host_tuple(host_str):
         elif len(parts) == 2:
             return (parts[0], int(parts[1]))
         else:
-            raise Exception('Malformed host: {}'.format(host))
+            raise Exception('Malformed host: {}'.format(host_str))
     return None
 
 
@@ -109,7 +109,7 @@ class CoreConfiguration(ConfigurationObject):
     @property
     def processes(self):
         """
-        Returns the number of processess Portal should spin up to handle
+        Returns the number of processes Portal should spin up to handle
         messages. If unset, this defaults to 1.
 
         Example
@@ -127,7 +127,7 @@ class CoreConfiguration(ConfigurationObject):
 
         Example
         --------
-        bind_host = localhost:5140
+        syslog_bind_host = localhost:5140
         """
         return _host_tuple(self._get('syslog_bind_host'))
 
@@ -140,7 +140,7 @@ class CoreConfiguration(ConfigurationObject):
 
         Example
         --------
-        bind_host = localhost:5000
+        zmq_bind_host = localhost:5000
         """
         return _host_tuple(self._get('zmq_bind_host'))
 
