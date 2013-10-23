@@ -7,10 +7,6 @@ from portal.log import get_logger, get_log_manager
 from portal.server import SyslogServer, start_io, stop_io
 from portal.input.syslog import SyslogMessageHandler
 
-config = config.load_config()
-
-logging_manager = get_log_manager()
-logging_manager.configure(config)
 
 _LOG = get_logger(__name__)
 
@@ -44,29 +40,37 @@ class MessageHandler(SyslogMessageHandler):
 
 
 if __name__ == '__main__':
-    ssl_options = None
+    try:
+        config = config.load_config()
 
-    cert_file = config.ssl.cert_file
-    key_file = config.ssl.key_file
+        logging_manager = get_log_manager()
+        logging_manager.configure(config)
 
-    if None not in (cert_file, key_file):
-        ssl_options = dict()
-        ssl_options['certfile'] = cert_file
-        ssl_options['keyfile'] = key_file
+        ssl_options = None
 
-        _LOG.debug('SSL enabled: {}'.format(ssl_options))
+        cert_file = config.ssl.cert_file
+        key_file = config.ssl.key_file
 
-    # Set up the syslog server
-    syslog_server = SyslogServer(
-        config.core.syslog_bind_host,
-        MessageHandler(),
-        ssl_options)
-    syslog_server.start()
+        if None not in (cert_file, key_file):
+            ssl_options = dict()
+            ssl_options['certfile'] = cert_file
+            ssl_options['keyfile'] = key_file
 
-    # Take over SIGTERM and SIGINT
-    signal.signal(signal.SIGTERM, stop)
-    signal.signal(signal.SIGINT, stop)
+            _LOG.debug('SSL enabled: {}'.format(ssl_options))
 
-    # Start I/O
-    start_io()
+        # Set up the syslog server
+        syslog_server = SyslogServer(
+            config.core.syslog_bind_host,
+            MessageHandler(),
+            ssl_options)
+        syslog_server.start()
+
+        # Take over SIGTERM and SIGINT
+        signal.signal(signal.SIGTERM, stop)
+        signal.signal(signal.SIGINT, stop)
+
+        # Start I/O
+        start_io()
+    except Exception as ex:
+        _LOG.exception(ex)
 
