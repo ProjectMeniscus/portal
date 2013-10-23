@@ -9,9 +9,13 @@ _CFG_DEFAULTS = {
         'syslog_bind_host': 'localhost:5140',
         'zmq_bind_host': 'localhost:5000'
     },
+    'ssl': {
+        'cert_file': None,
+        'key_file': None
+    },
     'logging': {
         'console': True,
-        'logfile': '/var/log/meniscus-portal/portal.log',
+        'logfile': None,
         'verbosity': 'WARNING'
     }
 }
@@ -44,7 +48,11 @@ class PortalConfiguration(object):
     """
     def __init__(self, cfg):
         self.core = CoreConfiguration(cfg)
+        self.ssl = SSLConfiguration(cfg)
         self.logging = LoggingConfiguration(cfg)
+
+    def __getattr__(self, name):
+        return None
 
 
 class ConfigurationObject(object):
@@ -143,6 +151,35 @@ class CoreConfiguration(ConfigurationObject):
         zmq_bind_host = localhost:5000
         """
         return _host_tuple(self._get('zmq_bind_host'))
+
+
+class SSLConfiguration(ConfigurationObject):
+    """
+    Class mapping for the Portal configuration section 'ssl'
+    """
+    @property
+    def cert_file(self):
+        """
+        Returns the path of the cert file for SSL configurations within
+        Portal. If left unset the value will default to None.
+
+        Example
+        --------
+        cert_file = /etc/pyrox/server.cert
+        """
+        return self._get('cert_file')
+
+    @property
+    def key_file(self):
+        """
+        Returns the path of the key file for SSL configurations within
+        Portal. If left unset the value will default to None.
+
+        Example
+        --------
+        key_file = /etc/pyrox/server.key
+        """
+        return self._get('key_file')
 
 
 class LoggingConfiguration(ConfigurationObject):

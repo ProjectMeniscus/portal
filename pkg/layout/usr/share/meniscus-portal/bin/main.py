@@ -24,10 +24,23 @@ if __name__ == '__main__':
     # Set up the zmq message caster
     caster = ZeroMQCaster(config.core.zmq_bind_host)
 
+    ssl_options = None
+
+    cert_file = config.ssl.cert_file
+    key_file = config.ssl.key_file
+
+    if None not in (cert_file, key_file):
+        ssl_options = dict()
+        ssl_options['certfile'] = cert_file
+        ssl_options['keyfile'] = key_file
+
+        _LOG.debug('SSL enabled: {}'.format(ssl_options))
+
     # Set up the syslog server
     syslog_server = SyslogServer(
         config.core.syslog_bind_host,
-        SyslogToZeroMQHandler(caster))
+        SyslogToZeroMQHandler(caster),
+        ssl_options)
     syslog_server.start()
 
     # Take over SIGTERM and SIGINT
