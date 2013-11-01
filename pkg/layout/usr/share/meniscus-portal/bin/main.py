@@ -4,7 +4,7 @@ import portal.config as config
 
 from portal.log import get_logger, get_log_manager
 from portal.server import SyslogServer, start_io, stop_io
-from portal.output.zmq_out import SyslogToZeroMQHandler, ZeroMQCaster
+from portal.transport import SyslogToZeroMQHandler, ZeroMQCaster
 
 
 def stop(signum, frame):
