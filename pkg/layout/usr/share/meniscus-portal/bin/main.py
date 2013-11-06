@@ -49,4 +49,3 @@ if __name__ == '__main__':
 
     # Start I/O
     start_io()
-
