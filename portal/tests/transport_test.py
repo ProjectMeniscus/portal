@@ -18,7 +18,7 @@ class WhenTestingSyslogToZeroMQHandler(unittest.TestCase):
         self.test_message = self.msg_part_1 + self.msg_part_2 + self.msg_part_3
         self.msg_length = 127
         self.final_message = self.msg_head.as_dict()
-        self.final_message['msg'] = self.test_message
+        self.final_message['message'] = self.test_message
         self.final_message['msg_length'] = self.msg_length
 
     def test_constructor(self):
@@ -195,7 +195,7 @@ class WhenIntegrationTestingTransport(unittest.TestCase):
         self.test_message = "test_message"
         self.msg_length = 127
         self.final_message = self.msg_head.as_dict()
-        self.final_message['msg'] = self.test_message
+        self.final_message['message'] = self.test_message
         self.final_message['msg_length'] = self.msg_length
         self.final_message_json = simplejson.dumps(self.final_message)
 

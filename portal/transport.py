@@ -58,7 +58,7 @@ class SyslogToZeroMQHandler(SyslogMessageHandler):
         :param msg_length: The byte count of the syslog message received
         """
         syslog_msg = self.msg_head.as_dict()
-        syslog_msg['msg'] = self.msg.decode('utf-8')
+        syslog_msg['message'] = self.msg.decode('utf-8')
         syslog_msg['msg_length'] = msg_length
 
         self.caster.cast(json.dumps(syslog_msg))
