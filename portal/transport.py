@@ -13,42 +13,6 @@ from portal.input.syslog import SyslogMessageHandler
 _LOG = get_logger(__name__)
 
 
-class ZeroMQCaster(object):
-    """
-    ZeroMQCaster allows for messages to be sent downstream by pushing
-    messages over a zmq socket to downstream clients.  If multiple clients
-    connect to this PUSH socket the messages will be load balanced evenly
-    across the clients.
-    """
-
-    def __init__(self, bind_host_tuple):
-        """
-        Creates an instance of the ZeroMQCaster.  A zmq PUSH socket is
-        created and is bound to the specified host:port.
-
-        :param bind_host_tuple: (host, port), for example ('127.0.0.1', '5000')
-        """
-        self.context = zmq.Context()
-        self.socket_type = zmq.PUSH
-        self.sock = self.context.socket(self.socket_type)
-        self.sock.bind('tcp://{0}:{1}'.format(*bind_host_tuple))
-
-    def cast(self, msg):
-        """
-        Sends a message over the zmq PUSH socket
-        """
-        try:
-            self.sock.send(msg)
-        except Exception as ex:
-            _LOG.exception(ex)
-
-    def close(self):
-        """
-        Close the zmq socket
-        """
-        self.sock.close()
-
-
 class SyslogToZeroMQHandler(SyslogMessageHandler):
     """
     SyslogToZeroMQHandler provides callback methods for the Syslog Parser.
@@ -65,6 +29,7 @@ class SyslogToZeroMQHandler(SyslogMessageHandler):
         self.msg = bytearray()
         self.msg_head = None
         self.caster = zmq_caster
+        self.caster.bind()
 
     def on_msg_head(self, msg_head):
         """
@@ -99,6 +64,63 @@ class SyslogToZeroMQHandler(SyslogMessageHandler):
         self.caster.cast(json.dumps(syslog_msg))
 
 
+class ZeroMQCaster(object):
+    """
+    ZeroMQCaster allows for messages to be sent downstream by pushing
+    messages over a zmq socket to downstream clients.  If multiple clients
+    connect to this PUSH socket the messages will be load balanced evenly
+    across the clients.
+    """
+
+    def __init__(self, bind_host_tuple):
+        """
+        Creates an instance of the ZeroMQCaster.  A zmq PUSH socket is
+        created and is bound to the specified host:port.
+
+        :param bind_host_tuple: (host, port), for example ('127.0.0.1', '5000')
+        """
+
+        self.socket_type = zmq.PUSH
+        self.bind_host = 'tcp://{0}:{1}'.format(*bind_host_tuple)
+        self.context = None
+        self.socket = None
+        self.bound = False
+
+    def bind(self):
+        """
+        Bind the ZeroMQCaster to a host:port to push out messages.
+        Create a zmq.Context and a zmq.PUSH socket, and bind the
+        socket to the specified host:port
+        """
+        self.context = zmq.Context()
+        self.socket = self.context.socket(self.socket_type)
+        self.socket.bind(self.bind_host)
+        self.bound = True
+
+    def cast(self, msg):
+        """
+        Sends a message over the zmq PUSH socket
+        """
+        if not self.bound:
+            raise zmq.error.ZMQError(
+                "ZeroMQCaster is not bound to a socket")
+        try:
+            self.socket.send(msg)
+        except Exception as ex:
+            _LOG.exception(ex)
+
+    def close(self):
+        """
+        Close the zmq socket
+        """
+        if self.bound:
+            self.socket.close()
+            self.context.destroy()
+            self.socket = None
+            self.context = None
+            self.bound = False
+
+
 class ZeroMQReceiver(object):
     """
     ZeroMQReceiver allows for messages to be received by pulling
@@ -108,28 +130,49 @@ class ZeroMQReceiver(object):
 
     def __init__(self, connect_host_tuples):
         """
-        Creates an instance of the ZeroMQReceiver.  A zmq PULL socket is
-        created and is connected to all specified host:port.
+        Creates an instance of the ZeroMQReceiver.
 
         :param connect_host_tuples: [(host, port), (host, port)],
         for example [('127.0.0.1', '5000'), ('127.0.0.1', '5001')]
         """
-        self.connect_host_tuples = connect_host_tuples
-        self.context = zmq.Context()
+        self.upstream_hosts = [
+            "tcp://{}:{}".format(*host_tuple)
+            for host_tuple in connect_host_tuples]
         self.socket_type = zmq.PULL
-        self.sock = self.context.socket(self.socket_type)
+        self.context = None
+        self.socket = None
+        self.connected = False
 
-        for host_tuple in self.connect_host_tuples:
-            self.sock.connect("tcp://{}:{}".format(*host_tuple))
+    def connect(self):
+        """
+        Connect the receiver to upstream hosts.  Create a zmq.Context
+        and a zmq.PULL socket, and is connect the socket to all
+        specified host:port tuples.
+        """
+        self.context = zmq.Context()
+        self.socket = self.context.socket(self.socket_type)
+
+        for host in self.upstream_hosts:
+            self.socket.connect(host)
+
+        self.connected = True
 
     def get(self):
         """
         Read a message form the zmq socket and return
         """
-        return self.sock.recv()
+        if not self.connected:
+            raise zmq.error.ZMQError(
+                "ZeroMQReceiver is not connected to a socket")
+        return self.socket.recv()
 
     def close(self):
         """
         Close the zmq socket
         """
-        self.sock.close()
+        if self.connected:
+            self.socket.close()
+            self.context.destroy()
+            self.socket = None
+            self.context = None
+            self.connected = False
