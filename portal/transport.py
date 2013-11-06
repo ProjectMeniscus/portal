@@ -62,6 +62,7 @@ class SyslogToZeroMQHandler(SyslogMessageHandler):
         syslog_msg['msg_length'] = msg_length
 
         self.caster.cast(json.dumps(syslog_msg))
+        del self.msg[:]
 
 
 class ZeroMQCaster(object):
