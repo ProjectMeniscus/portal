@@ -56,6 +56,7 @@ class WhenTestingSyslogToZeroMQHandler(unittest.TestCase):
         self.handler.on_msg_complete(self.msg_length)
         self.caster.cast.assert_called_once_with(
             simplejson.dumps(self.final_message))
+        self.assertEqual(self.handler.msg, b'')
 
 
 class WhenTestingZeroMqCaster(unittest.TestCase):
