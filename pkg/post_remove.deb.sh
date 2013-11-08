@@ -23,11 +23,11 @@ case "$1" in
     purge)
         echo "Purging meniscus-portal..." >&2
         if (getent passwd meniscus-portal) > /dev/null 2>&1; then
-            userdel meniscus-portal || true
+            userdel portal || true
         fi
 
         if (getent group meniscus-portal) > /dev/null 2>&1; then
-            groupdel meniscus-portal || true
+            groupdel portal || true
         fi
 
         [ -e /var/lib/meniscus-portal ] && rm -rf /var/lib/meniscus-portal
