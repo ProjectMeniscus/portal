@@ -22,25 +22,25 @@ case "$1" in
     configure)
         . /usr/share/debconf/confmodule
 
-        if ! (getent group meniscus-portal) > /dev/null 2>&1; then
-            addgroup --quiet --system meniscus-portal > /dev/null
+        if ! (getent group portal) > /dev/null 2>&1; then
+            addgroup --quiet --system portal > /dev/null
         fi
 
-        if ! (getent passwd meniscus-portal) > /dev/null 2>&1; then
-            adduser --quiet --system --home /var/lib/meniscus-portal --ingroup meniscus-portal --no-create-home --shell /bin/false meniscus-portal
+        if ! (getent passwd portal) > /dev/null 2>&1; then
+            adduser --quiet --system --home /var/lib/meniscus-portal --ingroup portal --no-create-home --shell /bin/false portal
         fi
 
-        chmod 0755 /etc/init.d/meniscus-portal
+        chmod 0755 /etc/init/meniscus-portal.conf
 
         if [ ! -d /var/log/meniscus-portal ]; then
             mkdir /var/log/meniscus-portal
-            chown -R meniscus-portal:adm /var/log/meniscus-portal/
+            chown -R portal:adm /var/log/meniscus-portal/
             chmod 0750 /var/log/meniscus-portal/
         fi
 
         if [ ! -d /var/lib/meniscus-portal ]; then
             mkdir /var/lib/meniscus-portal
-            chown meniscus-portal:meniscus-portal -R /var/lib/meniscus-portal/ /etc/meniscus-portal
+            chown portal:portal -R /var/lib/meniscus-portal/ /etc/meniscus-portal
             chmod -R 0700 /etc/meniscus-portal/
         fi
     ;;
