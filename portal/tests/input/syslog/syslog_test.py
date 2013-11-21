@@ -50,6 +50,13 @@ MISSING_FIELDS = bytearray(
 NO_STRUCTURED_DATA = bytearray(
     b'30 <46>1 - tohru - 6611 - - start')
 
+BLANK_CHAR_MESSAGE = bytearray(
+    b'156 <13>1 2013-11-19T20:30:58+00:00 '
+    b'c-10-13-0-254.c0002.netdev-ord.ohthree.com - - - '
+    b'[meniscus tenant="95feffb0" '
+    b'token="4c5e9071-6791-4023-859c-aa39077582d0"] \n'
+)
+
 
 def chunk_message(data, parser, chunk_size=10):
     limit = len(data)
@@ -218,6 +225,20 @@ class MissingSDValidator(MessageValidator):
         test.assertEqual('-', msg_head.messageid)
         test.assertEqual(0, len(msg_head.sd))
 
+msg_1 = '156 <13>1 2013-11-19T20:30:58+00:00 c-10-13-0-254.c0002.netdev-ord.ohthree.com - - - [meniscus tenant="95feffb0" token="4c5e9071-6791-4023-859c-aa39077582d0"] '
+class BlankCharMessageValidator(MessageValidator):
+
+    def _validate(self, test, caught_exception, msg_head, msg):
+        test.assertEqual('13', msg_head.priority)
+        test.assertEqual('1', msg_head.version)
+        test.assertEqual('2013-11-19T20:30:58+00:00', msg_head.timestamp)
+        test.assertEqual('c-10-13-0-254.c0002.netdev-ord.ohthree.com', msg_head.hostname)
+        test.assertEqual('-', msg_head.appname)
+        test.assertEqual('-', msg_head.processid)
+        test.assertEqual('-', msg_head.messageid)
+        test.assertEqual('\n', msg)
+
+
 
 class WhenParsingSyslog(unittest.TestCase):
 
@@ -287,6 +308,14 @@ class WhenParsingSyslog(unittest.TestCase):
         parser = Parser(validator)
 
         chunk_message(NO_STRUCTURED_DATA, parser)
+        self.assertTrue(validator.called)
+        validator.validate()
+
+    def test_read_message_with_blank_char(self):
+        validator = BlankCharMessageValidator(self)
+        parser = Parser(validator)
+
+        chunk_message(BLANK_CHAR_MESSAGE, parser)
         self.assertTrue(validator.called)
         validator.validate()
 
