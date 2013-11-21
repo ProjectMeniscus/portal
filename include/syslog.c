@@ -10,6 +10,7 @@
 #include <errno.h>
 
 // Macros
+#define DEBUG_OUTPUT            0
 #define RFC3164_MAX_BYTES       1024
 #define RFC5424_MAX_BYTES       2048
 #define MAX_BUFFER_SIZE         (RFC5424_MAX_BYTES * 32)
@@ -19,7 +20,6 @@
 #define IS_ALPHA(c)         (LOWER(c) >= 'a' && LOWER(c) <= 'z')
 #define IS_NUM(c)           ((c) >= '0' && (c) <= '9')
 #define IS_ALPHANUM(c)      (IS_ALPHA(c) || IS_NUM(c))
-
 
 // Typedefs
 typedef enum {
@@ -225,10 +225,9 @@ int read_message(syslog_parser *parser, const syslog_parser_settings *settings, 
     int read;
 
     if (parser->flags & F_COUNT_OCTETS) {
-        // If we're counting octets then the message ends when we run out of octsts
+        // If we're counting octets then the message ends when we run out of octets
         read = parser->octets_remaining >= length ? length : parser->octets_remaining;
         parser->octets_remaining -= read;
-
         msg_complete = parser->octets_remaining == 0;
     } else {
         int d_index;
@@ -360,6 +359,7 @@ int sd_start(syslog_parser *parser, const syslog_parser_settings *settings, char
             break;
 
         default:
+
             set_state(parser, s_message);
             on_cb(parser, settings->on_msg_head_complete);
             retval = pa_rehash;
@@ -501,7 +501,8 @@ int uslg_parser_exec(syslog_parser *parser, const syslog_parser_settings *settin
                     break;
 
                 case '\r':
-                case '\n':
+                //case '\n':  removed for issues with syslog messages with empty msg field
+
                     if (!(parser->flags & F_COUNT_OCTETS)) {
                         parser->error = SLERR_PREMATURE_MSG_END;
                     }
